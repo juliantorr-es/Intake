@@ -2,14 +2,19 @@
 
 Passkey-gated, locally decryptable client intake platform for a freelance services website.
 
-## Architecture
+Intake follows a split-brain architecture designed for maximum security of sensitive client data:
 
-Intake follows a clear separation between the **public backend** and the **local operator console**:
-
-- **Public Backend**: receives, validates, encrypts, stores, and notifies
-- **Local Operator Console**: decrypts, reviews, quotes, schedules, and acts
+- **Hosted Intake (Public)**: A public-facing web backend that handles client interactions, authentication, and encrypted data storage. It acts as the system's "boring, always-on" presence.
+- **Local Intake Console (Local)**: A private, local management application (Rig-style) that manages the hosted backend, reviews sensitive client data, and controls site configuration.
+- **Intake Sync**: An outbound-only protocol between the Local Console and the Hosted Backend.
 
 ### Core Boundaries
+
+- **No private keys in the public backend**: The hosted backend never holds the private decryption key for sensitive client data.
+- **Local-only decryption**: All sensitive quote payloads and exact locations are decrypted strictly within the Local Intake Console.
+- **Outbound-only sync**: The Local Console initiates all connections to the Hosted Backend (polling or WebSocket client); the hosted backend never connects inbound to a local machine.
+- **No passwords**: Passkey-first authentication only.
+- **Redacted public state**: Public APIs only expose non-sensitive summaries; full data is only available via the sync protocol to authenticated operator devices.
 
 - No passwords - passkey-first authentication only
 - No raw session tokens in storage

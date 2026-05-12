@@ -25,3 +25,8 @@ async def get_current_account_id(
             return session.account_id
 
     raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+def get_account_repo() -> AccountRepository:
+    """Dependency to get an AccountRepository."""
+    return AccountRepository()

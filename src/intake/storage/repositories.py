@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from sqlmodel import select, and_, or_, func, update
 
 from intake.config import get_settings
-from intake.domain.accounts import Account, Session as SessionDomain
+from intake.domain.accounts import Account, Session as SessionDomain, EmailVerificationCode
 from intake.domain.time import utc_now
 from intake.domain.crypto import EncryptedPayload
 from intake.domain.events import Event, EventAggregateType, EventType, EventActorType
@@ -28,6 +28,7 @@ from intake.storage.models import (
     QuoteModel,
     SessionModel,
     UploadModel,
+    EmailVerificationCodeModel,
 )
 
 
@@ -91,34 +92,43 @@ class AccountRepository:
         """Get account by ID as domain model."""
         model = self.get(id)
         if model:
-            return Account(
-                id=model.id,
-                created_at=model.created_at,
-                updated_at=model.updated_at,
-            )
+            return model.to_domain()
         return None
+
+    def get_by_email_hash(self, email_hash: str) -> Account | None:
+        """Get account by normalized email hash."""
+        with self._get_session() as session:
+            statement = select(AccountModel).where(AccountModel.normalized_email_hash == email_hash)
+            model = session.exec(statement).first()
+            if model:
+                return model.to_domain()
+            return None
 
     def create(self, account: Account) -> Account:
         """Create a new account."""
         with self._get_session() as session:
-            model = AccountModel(
-                id=account.id,
-                created_at=account.created_at,
-                updated_at=account.updated_at,
-            )
+            model = AccountModel.from_domain(account)
             session.add(model)
             session.commit()
             session.refresh(model)
-            return account
+            return model.to_domain()
 
     def update(self, account: Account) -> Account:
         """Update an account."""
+        import json
         with self._get_session() as session:
             model = session.get(AccountModel, account.id)
             if model:
                 model.updated_at = account.updated_at
+                model.email_verified_at = account.email_verified_at
+                model.normalized_email_hash = account.normalized_email_hash
+                if account.encrypted_email:
+                    model.encrypted_email = json.dumps(account.encrypted_email.model_dump())
+                else:
+                    model.encrypted_email = None
                 session.commit()
                 session.refresh(model)
+                return model.to_domain()
             return account
 
 
@@ -642,5 +652,88 @@ class EventRepository:
             statement = select(EventModel).order_by(EventModel.created_at.desc()).limit(limit)
             models = list(session.exec(statement).all())
             return [m.to_domain() for m in models]
+
+
+# ========== Email Verification Repository ==========
+
+
+class EmailVerificationRepository:
+    """Repository for email verification operations."""
+
+    def __init__(self, session: DBSession | None = None):
+        self._session = session
+
+    @contextmanager
+    def _get_session(self) -> Any:
+        """Get a session, using provided one or creating new."""
+        if self._session:
+            yield self._session
+        else:
+            with get_session() as session:
+                yield session
+
+    def get_by_id(self, code_id: str) -> EmailVerificationCode | None:
+        """Get code by ID."""
+        with self._get_session() as session:
+            model = session.get(EmailVerificationCodeModel, code_id)
+            if model:
+                return model.to_domain()
+            return None
+
+    def get_active_by_email_hash(self, email_hash: str) -> list[EmailVerificationCode]:
+        """Get all active (not consumed, not expired) codes for an email hash."""
+        with self._get_session() as session:
+            statement = select(EmailVerificationCodeModel).where(
+                and_(
+                    EmailVerificationCodeModel.email_hash == email_hash,
+                    EmailVerificationCodeModel.consumed_at.is_(None),
+                    EmailVerificationCodeModel.expires_at > utc_now(),
+                )
+            )
+            models = list(session.exec(statement).all())
+            return [m.to_domain() for m in models]
+
+    def create(self, code: EmailVerificationCode) -> EmailVerificationCode:
+        """Create a new verification code."""
+        with self._get_session() as session:
+            model = EmailVerificationCodeModel.from_domain(code)
+            session.add(model)
+            session.commit()
+            session.refresh(model)
+            return model.to_domain()
+
+    def update(self, code: EmailVerificationCode) -> EmailVerificationCode | None:
+        """Update a verification code (e.g., increment attempts)."""
+        with self._get_session() as session:
+            model = session.get(EmailVerificationCodeModel, code.id)
+            if model:
+                model.attempts = code.attempts
+                model.consumed_at = code.consumed_at
+                session.commit()
+                session.refresh(model)
+                return model.to_domain()
+            return None
+
+    def consume(self, code_id: str) -> bool:
+        """Mark a code as consumed."""
+        with self._get_session() as session:
+            model = session.get(EmailVerificationCodeModel, code_id)
+            if model and not model.consumed_at:
+                model.consumed_at = utc_now()
+                session.commit()
+                return True
+            return False
+
+    def cleanup_expired(self) -> int:
+        """Remove expired codes. Returns count removed."""
+        with self._get_session() as session:
+            statement = select(EmailVerificationCodeModel).where(
+                EmailVerificationCodeModel.expires_at < utc_now()
+            )
+            models = list(session.exec(statement).all())
+            for model in models:
+                session.delete(model)
+            session.commit()
+            return len(models)
 
 

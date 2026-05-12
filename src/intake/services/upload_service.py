@@ -16,6 +16,7 @@ from intake.storage.repositories import (
     PasskeyRepository,
     QuoteRepository,
 )
+from intake.config import get_settings
 
 
 class UploadService:
@@ -33,16 +34,19 @@ class UploadService:
     def __init__(
         self,
         quote_repo: QuoteRepository | None = None,
+        account_repo: AccountRepository | None = None,
         event_repo: EventRepository | None = None,
         crypto_service: Any | None = None,
         storage_service: Any | None = None,
         validation_service: Any | None = None,
     ):
         self._quote_repo = quote_repo or QuoteRepository()
+        self._account_repo = account_repo or AccountRepository()
         self._event_repo = event_repo or EventRepository()
         self._crypto_service = crypto_service or get_crypto_service()
         self._storage_service = storage_service or get_storage_service()
         self._validation_service = validation_service or get_upload_validation_service()
+        self._settings = get_settings()
 
     def handle_upload(self, account_id: str, quote_id: str, upload_file: UploadFile) -> Upload:
         """Handle a file upload for a quote.
@@ -65,6 +69,12 @@ class UploadService:
         
         if quote.account_id != account_id:
             raise HTTPException(status_code=403, detail="Not authorized to upload to this quote")
+
+        # 1.5 Check email verification if required
+        if self._settings.intake_require_verified_email_for_uploads:
+            account = self._account_repo.get_by_id(account_id)
+            if not account or not account.email_verified_at:
+                raise HTTPException(status_code=403, detail="Email verification required for uploads")
 
         # 2. Basic validation (state, count)
         total_bytes = sum(u.size_bytes for u in quote.uploads if u.status == UploadStatus.ACCEPTED)

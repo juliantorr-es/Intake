@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from intake.domain.crypto import EncryptedPayload
 from intake.domain.events import EventAggregateType
 from intake.domain.time import utc_now
 
@@ -18,6 +19,18 @@ class Account(BaseModel):
 
     # No passwords, no email as primary auth - passkey only
     # Email may be added later as contact/recovery, but not for login
+    encrypted_email: EncryptedPayload | None = None
+    normalized_email_hash: str | None = None
+    email_verified_at: datetime | None = None
+
+    @property
+    def email_status(self) -> str:
+        """Return email status summary."""
+        if not self.normalized_email_hash:
+            return "none"
+        if not self.email_verified_at:
+            return "pending"
+        return "verified"
 
     @property
     def aggregate_type(self) -> EventAggregateType:
@@ -59,3 +72,28 @@ class Session(BaseModel):
     def is_revoked(self) -> bool:
         """Check if session has been revoked."""
         return self.revoked_at is not None
+
+
+class EmailVerificationCode(BaseModel):
+    """Email verification code domain model."""
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    account_id: str
+    email_hash: str  # Hash of normalized email for lookup
+    code_hash: str  # Hash of the verification code
+    attempts: int = 0
+    max_attempts: int = 5
+    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime
+    consumed_at: datetime | None = None
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if code has expired."""
+        from intake.domain.time import utc_is_expired, as_aware_utc
+        return utc_is_expired(as_aware_utc(self.expires_at))
+
+    @property
+    def can_attempt(self) -> bool:
+        """Check if more attempts are allowed."""
+        return self.attempts < self.max_attempts and not self.consumed_at and not self.is_expired

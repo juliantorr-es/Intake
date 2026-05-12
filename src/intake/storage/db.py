@@ -16,6 +16,7 @@ from intake.storage.models import (  # noqa: F401
     QuoteModel,
     SessionModel,
     UploadModel,
+    EmailVerificationCodeModel,
 )
 
 

@@ -41,6 +41,16 @@
                     </div>
                 </div>
 
+                <div id="email-verification-section" class="card" style="display: none;">
+                    <h2 class="card-title">Email Verification</h2>
+                    <div class="card-body">
+                        <p class="text-muted mb-md">
+                            Verify your email to enable quote submissions and uploads.
+                        </p>
+                        <div id="email-verification-container"></div>
+                    </div>
+                </div>
+
                 <div class="card" style="border-left: 4px solid var(--color-primary);">
                     <h2 class="card-title">Local Dev Debug</h2>
                     <div class="card-body">
@@ -72,6 +82,7 @@
             logout,
             RP_CONFIG
         } from '/static/js/passkeys.js';
+        import { createEmailVerificationUI } from '/static/js/account.js';
         
         document.addEventListener('DOMContentLoaded', async () => {
             const authContainer = document.getElementById('passkey-auth-container');
@@ -103,6 +114,13 @@
                     });
                     sessionStatus.appendChild(document.createElement('br'));
                     sessionStatus.appendChild(logoutBtn);
+
+                    // Show email verification section
+                    const emailSection = document.getElementById('email-verification-section');
+                    if (emailSection) {
+                        emailSection.style.display = 'block';
+                        createEmailVerificationUI('email-verification-container');
+                    }
                 } else {
                     sessionStatus.textContent = 'Not signed in';
                     

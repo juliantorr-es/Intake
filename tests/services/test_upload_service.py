@@ -20,6 +20,7 @@ def temp_upload_root(tmp_path):
 def mock_repos():
     return {
         "quote": MagicMock(),
+        "account": MagicMock(),
         "event": MagicMock(),
     }
 
@@ -35,8 +36,15 @@ def upload_service(mock_repos, temp_upload_root):
         ciphertext="encrypted", nonce="nonce", tag="tag"
     )
     
+    # Mock verified account by default
+    from intake.domain.accounts import Account
+    from datetime import datetime
+    mock_account = Account(id="user-1", email_verified_at=datetime.now())
+    mock_repos["account"].get_by_id.return_value = mock_account
+    
     return UploadService(
         quote_repo=mock_repos["quote"],
+        account_repo=mock_repos["account"],
         event_repo=mock_repos["event"],
         crypto_service=crypto,
         storage_service=storage,
@@ -55,6 +63,23 @@ def test_upload_ownership_check(upload_service, mock_repos):
     
     assert excinfo.value.status_code == 403
     assert "Not authorized" in excinfo.value.detail
+
+def test_upload_email_verification_check(upload_service, mock_repos):
+    # Mock quote owned by user but account not verified
+    mock_quote = Quote(id="quote-1", account_id="user-1", status=QuoteStatus.DRAFT)
+    mock_repos["quote"].get_by_id.return_value = mock_quote
+    
+    from intake.domain.accounts import Account
+    mock_account = Account(id="user-1", email_verified_at=None)
+    mock_repos["account"].get_by_id.return_value = mock_account
+    
+    mock_file = MagicMock()
+    
+    with pytest.raises(HTTPException) as excinfo:
+        upload_service.handle_upload("user-1", "quote-1", mock_file)
+    
+    assert excinfo.value.status_code == 403
+    assert "Email verification required" in excinfo.value.detail
 
 def test_upload_quote_status_check(upload_service, mock_repos):
     # Mock quote in immutable state

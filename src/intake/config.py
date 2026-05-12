@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # Challenge expiry in seconds
     intake_challenge_expiry: int = Field(default=300)
 
+    # Email verification
+    intake_require_verified_email_for_uploads: bool = Field(default=True)
+    intake_require_verified_email_for_quote_submit: bool = Field(default=True)
+    intake_email_code_ttl_seconds: int = Field(default=900)
+    intake_email_code_max_attempts: int = Field(default=5)
+
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
@@ -74,9 +80,14 @@ class Settings(BaseSettings):
             return self.intake_session_cookie_secure
         return self.is_production
 
+    @property
+    def workspace_root(self) -> Path:
+        """Get the workspace root directory."""
+        return Path(__file__).parent.parent.parent.parent
+
     def ensure_build_dir(self) -> Path:
         """Ensure the build/data directory exists."""
-        build_path = Path("/var/tmp/intake")
+        build_path = self.workspace_root / ".build" / "intake"
         build_path.mkdir(parents=True, exist_ok=True)
         return build_path
 

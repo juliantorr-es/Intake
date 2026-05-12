@@ -13,7 +13,8 @@ from intake.domain.quotes import (
 )
 from intake.services.crypto_service import get_crypto_service
 from intake.services.event_log import get_event_log_service
-from intake.storage.repositories import QuoteRepository
+from intake.config import get_settings
+from intake.storage.repositories import QuoteRepository, AccountRepository
 
 
 class QuoteService:
@@ -22,6 +23,7 @@ class QuoteService:
     def __init__(
         self,
         repo: QuoteRepository | None = None,
+        account_repo: AccountRepository | None = None,
         crypto_service: Any | None = None,
         event_log: Any | None = None,
     ):
@@ -33,8 +35,10 @@ class QuoteService:
             event_log: EventLogService instance
         """
         self._repo = repo or QuoteRepository()
+        self._account_repo = account_repo or AccountRepository()
         self._crypto = crypto_service or get_crypto_service()
         self._event_log = event_log or get_event_log_service()
+        self._settings = get_settings()
 
     def create_quote(self, service_lane: QuoteServiceLane | None = None) -> Quote:
         """Create a new quote in DRAFT status."""
@@ -191,6 +195,12 @@ class QuoteService:
 
         if not quote.can_submit():
             return None
+
+        # Check email verification if required
+        if self._settings.intake_require_verified_email_for_quote_submit:
+            account = self._account_repo.get_by_id(account_id)
+            if not account or not account.email_verified_at:
+                return None  # Or raise a specific exception
 
         quote.status = QuoteStatus.SUBMITTED
         quote.account_id = account_id

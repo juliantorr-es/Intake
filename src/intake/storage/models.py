@@ -25,6 +25,45 @@ class AccountModel(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
+    # Email metadata
+    encrypted_email: str | None = Field(default=None, sa_column=Column(JSON))
+    normalized_email_hash: str | None = Field(default=None, index=True, unique=True)
+    email_verified_at: datetime | None = Field(default=None, index=True)
+
+    @classmethod
+    def from_domain(cls, account: Any) -> "AccountModel":
+        """Create a database model from a domain account."""
+        encrypted_email = None
+        if account.encrypted_email:
+            encrypted_email = json.dumps(account.encrypted_email.model_dump())
+        
+        return cls(
+            id=account.id,
+            created_at=account.created_at,
+            updated_at=account.updated_at,
+            encrypted_email=encrypted_email,
+            normalized_email_hash=account.normalized_email_hash,
+            email_verified_at=account.email_verified_at,
+        )
+
+    def to_domain(self) -> Any:
+        """Convert to domain model."""
+        from intake.domain.accounts import Account
+        from intake.domain.crypto import EncryptedPayload
+
+        encrypted_email = None
+        if self.encrypted_email:
+            encrypted_email = EncryptedPayload(**json.loads(self.encrypted_email))
+
+        return Account(
+            id=self.id,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            encrypted_email=encrypted_email,
+            normalized_email_hash=self.normalized_email_hash,
+            email_verified_at=self.email_verified_at,
+        )
+
 
 # ========== Session Models ==========
 
@@ -44,6 +83,32 @@ class SessionModel(SQLModel, table=True):
     expires_at: datetime = Field(index=True)
     revoked_at: datetime | None = Field(default=None, index=True)
     last_seen_at: datetime | None = Field(default=None)
+
+    @classmethod
+    def from_domain(cls, session: Any) -> "SessionModel":
+        """Create a database model from a domain session."""
+        return cls(
+            id=session.id,
+            account_id=session.account_id,
+            token_hash=session.token_hash,
+            created_at=session.created_at,
+            expires_at=session.expires_at,
+            revoked_at=session.revoked_at,
+            last_seen_at=session.last_seen_at,
+        )
+
+    def to_domain(self) -> Any:
+        """Convert to domain model."""
+        from intake.domain.accounts import Session
+        return Session(
+            id=self.id,
+            account_id=self.account_id,
+            token_hash=self.token_hash,
+            created_at=self.created_at,
+            expires_at=self.expires_at,
+            revoked_at=self.revoked_at,
+            last_seen_at=self.last_seen_at,
+        )
 
 
 # ========== Passkey Models ==========
@@ -87,6 +152,55 @@ class PasskeyCredentialModel(SQLModel, table=True):
     backup_state: bool = Field(default=False)
     device_label: str | None = Field(default=None)
     revoked_at: datetime | None = Field(default=None, index=True)
+
+
+# ========== Email Verification Models ==========
+
+
+class EmailVerificationCodeModel(SQLModel, table=True):
+    """Email verification code database model."""
+
+    __tablename__ = "email_verification_codes"
+
+    id: str = Field(default=None, primary_key=True, index=True)
+    account_id: str = Field(foreign_key="accounts.id", index=True)
+    email_hash: str = Field(index=True)
+    code_hash: str = Field(index=True)
+    attempts: int = Field(default=0)
+    max_attempts: int = Field(default=5)
+    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime = Field(index=True)
+    consumed_at: datetime | None = Field(default=None, index=True)
+
+    @classmethod
+    def from_domain(cls, code: Any) -> "EmailVerificationCodeModel":
+        """Create a database model from a domain code."""
+        return cls(
+            id=code.id,
+            account_id=code.account_id,
+            email_hash=code.email_hash,
+            code_hash=code.code_hash,
+            attempts=code.attempts,
+            max_attempts=code.max_attempts,
+            created_at=code.created_at,
+            expires_at=code.expires_at,
+            consumed_at=code.consumed_at,
+        )
+
+    def to_domain(self) -> Any:
+        """Convert to domain model."""
+        from intake.domain.accounts import EmailVerificationCode
+        return EmailVerificationCode(
+            id=self.id,
+            account_id=self.account_id,
+            email_hash=self.email_hash,
+            code_hash=self.code_hash,
+            attempts=self.attempts,
+            max_attempts=self.max_attempts,
+            created_at=self.created_at,
+            expires_at=self.expires_at,
+            consumed_at=self.consumed_at,
+        )
 
 
 # ========== Quote Models ==========

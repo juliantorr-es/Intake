@@ -9,6 +9,7 @@ from intake.storage.models import (
     QuoteModel,
     SessionModel,
     UploadModel,
+    EmailVerificationCodeModel,
 )
 from intake.storage.repositories import (
     AccountRepository,
@@ -17,6 +18,7 @@ from intake.storage.repositories import (
     PasskeyRepository,
     QuoteRepository,
     SessionRepository,
+    EmailVerificationRepository,
 )
 
 __all__ = [
@@ -28,10 +30,12 @@ __all__ = [
     "QuoteModel",
     "SessionModel",
     "UploadModel",
+    "EmailVerificationCodeModel",
     "AccountRepository",
     "ChallengeRepository",
     "EventRepository",
     "PasskeyRepository",
     "QuoteRepository",
     "SessionRepository",
+    "EmailVerificationRepository",
 ]

@@ -25,6 +25,8 @@ class EventType(StrEnum):
     ACCOUNT_CREATED = auto()
     ACCOUNT_SESSION_CREATED = auto()
     ACCOUNT_SESSION_ENDED = auto()
+    ACCOUNT_EMAIL_VERIFICATION_SENT = auto()
+    ACCOUNT_EMAIL_VERIFIED = auto()
 
     # Passkey events
     PASSKEY_CHALLENGE_CREATED = auto()
