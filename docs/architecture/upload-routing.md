@@ -95,70 +95,33 @@ The upload router evaluates providers in this exact order:
 
 ## Route Decision Model
 
+The **Hosted Upload Session Broker** is the authoritative source for upload routes. It evaluates the local receiver's availability and issues time-limited upload sessions.
+
 ### UploadRouteDecision
 
 ```python
 class UploadRouteDecision(BaseModel):
-    # Decision
-    chosen_provider: UploadProviderKind
-    route_priority: int  # 1 = highest, 3 = lowest
-    route_reason: str
-    
-    # Fallback info
-    fallback_available: bool = False
-    fallback_provider: Optional[UploadProviderKind] = None
-    
-    # Upload details (NO secrets)
-    upload_endpoint: str
-    upload_session: Optional[dict[str, str]] = None  # Temp auth only
-    expires_at: Optional[datetime] = None
+    """Authoritative decision for where a client should upload files."""
+    quote_id: str
+    provider_kind: UploadProviderKind
+    public_url: str
+    session_token: str
+    expires_at: datetime
+    capabilities: list[UploadProviderCapability]
 ```
 
-### Decision Rules
+### Decision Logic (Hosted)
 
-```python
-def decide_upload_route(
-    local_handshake: ReceiverHandshakeResult,
-    fallback_policy: UploadFallbackPolicy,
-    file_size: int
-) -> UploadRouteDecision:
-    
-    # Priority 1: Local receiver available
-    if local_handshake.success:
-        return UploadRouteDecision(
-            chosen_provider=UploadProviderKind.LOCAL_LOOPBACK_DEV,
-            route_priority=1,
-            route_reason="Local receiver online and handshake succeeded",
-            fallback_available=True,
-            fallback_provider=fallback_policy.fallback_providers[0] if fallback_policy.fallback_providers else None,
-            upload_endpoint="http://127.0.0.1:8001/upload",
-            upload_session=generate_temp_upload_session(),
-            expires_at=datetime.now() + timedelta(minutes=10)
-        )
-    
-    # Priority 2: Fallback provider available
-    for provider in fallback_policy.fallback_providers:
-        if provider_healthy(provider) and provider_supports(provider, file_size):
-            return UploadRouteDecision(
-                chosen_provider=provider,
-                route_priority=2,
-                route_reason=f"Local offline, {provider.value} fallback available",
-                fallback_available=False,
-                fallback_provider=None,
-                upload_endpoint=get_provider_endpoint(provider),
-                upload_session=generate_temp_upload_session(provider),
-                expires_at=datetime.now() + timedelta(minutes=fallback_policy.fallback_expiry_minutes)
-            )
-    
-    # Priority 3: No storage available, quote without files
-    return UploadRouteDecision(
-        chosen_provider=UploadProviderKind.LOCAL_LOOPBACK_DEV,  # Will fail, client handles
-        route_priority=3,
-        route_reason="All providers offline",
-        fallback_available=False,
-        upload_endpoint="",
-    )
-```
+The broker uses the following logic to issue a route:
+
+1. **Authorize**: Verifies client session, quote ownership, and status.
+2. **Consult Local**: Checks for an active Local Receiver handshake (or assumes loopback/dev in v0).
+3. **Issue Session**: Generates a cryptographically strong `session_token` for the chosen provider.
+4. **Respond**: Returns the public URL and token to the client.
+
+**Implementation**: `src/intake/services/upload_session_broker.py`
+**Endpoint**: `POST /quotes/{id}/upload-route`
+
 
 ## Fallback Policy Configuration
 

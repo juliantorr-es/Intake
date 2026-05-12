@@ -151,11 +151,28 @@ def test_local_decryption_loop(test_crypto):
     mock_client = MagicMock()
     mock_client.fetch_quote_envelope.return_value = envelope
     
+    # Mock the pending reviews to include this quote
+    from intake.sync.models import HostedQuoteProjection
+    from datetime import datetime
+    mock_client.fetch_pending_projections.return_value = [
+        HostedQuoteProjection(
+            quote_id="quote-1", 
+            status="needs_review", 
+            created_at=datetime.now(), 
+            updated_at=datetime.now(),
+            has_encrypted_payload=True,
+            upload_count=0,
+            email_verified=True,
+            decrypted=True
+        )
+    ]
+    
     service = LocalQuoteReviewService(sync_client=mock_client, crypto_service=test_crypto)
     review = service.get_decrypted_review("quote-1")
     
     assert review.quote_id == "quote-1"
     assert review.exact_location == location
+    assert review.updated_at is not None
 
 def test_local_decryption_failure_wrong_key(test_crypto):
     """Verify that local review fails safely if the wrong key is used."""
@@ -171,6 +188,22 @@ def test_local_decryption_failure_wrong_key(test_crypto):
     mock_client.fetch_quote_envelope.return_value = envelope
     
     service = LocalQuoteReviewService(sync_client=mock_client, crypto_service=wrong_crypto)
+    
+    # Mock the pending reviews to include this quote
+    from intake.sync.models import HostedQuoteProjection
+    from datetime import datetime
+    service.get_pending_reviews = MagicMock(return_value=[
+        HostedQuoteProjection(
+            quote_id="quote-1", 
+            status="needs_review", 
+            created_at=datetime.now(), 
+            updated_at=datetime.now(),
+            has_encrypted_payload=True,
+            upload_count=0,
+            email_verified=True,
+            decrypted=True
+        )
+    ])
     
     with pytest.raises(ValueError, match="Decryption failed"):
         service.get_decrypted_review("quote-1")

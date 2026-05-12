@@ -62,6 +62,18 @@ def test_quote_review_model_redaction():
         assert "storage_ref" not in ev
         assert "local_path" not in ev
 
+@pytest.fixture(autouse=True)
+def setup_settings():
+    from intake.config import get_settings
+    from pydantic import SecretStr
+    from intake.services.signing_service import LocalDeviceSigningService
+    settings = get_settings()
+    # Generate a real Ed25519 key string
+    signer = LocalDeviceSigningService()
+    settings.intake_local_signing_key = SecretStr(signer.get_private_key_base64())
+    yield
+    settings.intake_local_signing_key = None
+
 def test_get_quotes_pending_api(monkeypatch):
     # Mock the service to avoid network calls
     from intake.local_console.review_service import LocalQuoteReviewService
@@ -75,7 +87,9 @@ def test_get_quotes_pending_api(monkeypatch):
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
                 has_encrypted_payload=True,
-                upload_count=1
+                upload_count=1,
+                email_verified=True,
+                decrypted=True
             )
         ]
     

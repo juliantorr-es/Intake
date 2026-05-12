@@ -64,6 +64,7 @@ def test_local_quote_review_decrypted(client, mock_review_service):
         quote_id="q1",
         status="reviewing",
         created_at=datetime.now(),
+        updated_at=datetime.now(),
         exact_location="123 Decrypted St",
         access_notes="Door code 1234"
     )

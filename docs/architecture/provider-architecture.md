@@ -24,6 +24,8 @@ Intake's open upload/provider architecture implements a local-first strategy wit
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+### Control Plane: Hosted Upload Session Broker
+The **Hosted Upload Session Broker** acts as the control plane for all upload providers. It centralizes routing decisions, session issuance, and receipt validation, ensuring that clients follow the authoritative path chosen by the Hosted Intake backend.
 
 ## Upload Route Priority
 
@@ -272,6 +274,7 @@ It CANNOT see:
 
 | Component | Status | File |
 |-----------|--------|------|
+| Hosted Upload Session Broker | ✅ **Done** | `src/intake/hosted/api/upload_broker.py` |
 | Provider kinds enum | ✅ **Done** | `src/intake/deploy/models_upload.py` |
 | Provider capabilities enum | ✅ **Done** | `src/intake/deploy/models_upload.py` |
 | Provider config redaction | ✅ **Done** | `src/intake/deploy/provider_redaction.py` |

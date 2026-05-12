@@ -508,8 +508,9 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
   - [Host Bootstrapping (updated)](docs/architecture/host-bootstrapping.md)
 
 ### 📋 Tests Added
-- `tests/test_railway_dry_run.py` - 20+ tests for Railway dry-run behavior
-- `tests/test_provider_routing.py` - 30+ tests for provider models and redaction
+- `tests/test_railway_dry_run.py` - 20+ tests
+- `tests/test_provider_routing.py` - 30+ tests
+- `tests/test_upload_broker.py` - 24+ tests for hosted upload logic
 
 ### 📋 Future Work (NOT in this slice)
 - Actual `railway up` execution
@@ -534,6 +535,16 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
   - File validation (content type, extension, size, limits)
   - Route decision integration
   - Local Console status integration
+
+- ✅ **Hosted Upload Session Broker** - Central policy authority for uploads:
+  - Route selection logic (Local Receiver priority, Fallback buffer)
+  - Secure upload session creation `/quotes/{id}/upload-route`
+  - Validated receipt processing `/quotes/{id}/uploads/receipt`
+  - Safe public summaries `/quotes/{id}/uploads`
+  - Redacted client-safe responses (no local paths, no keys/tokens)
+  - Quote-level ownership and status authorization
+  - Verified email enforcement for upload sessions
+  - SHA256 integrity verification across the boundary
 
 - ✅ **Tunnel Adapter Dry-Run Scaffolding** - Dry-run only tunnel integration:
   - Tailscale Funnel adapter with read-only CLI detection
@@ -571,13 +582,12 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
 
 ## Next Recommended Slice
 
-**Tunnel Activation Layer**: Disable dry-run mode and enable real tunnel activation.
+**Client Upload UI Integration**: Wire the public client quote flow to the Hosted Upload Session Broker.
 
 This will:
-- Add explicit approval mechanism for tunnel activation
-- Enable actual execution of tunnel commands (behind approval gate)
-- Add TLS certificate management for exposed endpoints
-- Add domain configuration for public URLs
-- Maintain all existing safety boundaries
+- Update the public quote page upload step
+- Implement browser-side upload flow (request route -> upload to receiver -> complete session -> send receipt)
+- Ensure safe DOM rendering and redacted status displays
+- Maintain all security boundaries regarding keys, tokens, and paths
 
-**Why this is next**: Tunnel adapter dry-run scaffolding is now complete with CLI detection and text-only command generation. The next step is to add the approval mechanism and real activation while maintaining all safety boundaries.
+**Why this is next**: The Hosted Upload Session Broker and Local Receiver are now fully implemented and tested. The next step is to make this capability available to clients through the public web interface.
