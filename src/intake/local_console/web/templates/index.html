@@ -80,21 +80,34 @@
             </section>
 
             <section id="view-quotes" class="view hidden">
-                <div class="quote-list-container">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>Status</th>
-                                <th>Area</th>
-                                <th>Uploads</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="quote-list-body">
-                            <!-- Rows will be injected here -->
-                        </tbody>
-                    </table>
+                <div class="panel">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2>Pending Review</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="btn-seed-demo" class="btn btn-secondary" style="font-size: 11px; padding: 4px 10px;">Seed Demo Data</button>
+                        </div>
+                    </div>
+                    <div class="quote-list-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%;">Quote ID</th>
+                                    <th style="width: 15%;">Status</th>
+                                    <th style="width: 20%;">Lane / Area</th>
+                                    <th style="width: 15%;">Created</th>
+                                    <th style="width: 10%;">Files</th>
+                                    <th style="width: 15%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="quote-list-body">
+                                <!-- Rows will be injected here -->
+                            </tbody>
+                        </table>
+                        <div id="quote-empty-state" class="hidden" style="text-align: center; padding: 40px; color: var(--color-muted);">
+                            <span style="font-size: 32px; display: block; margin-bottom: 12px;">📥</span>
+                            <p>No quotes pending review.</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -113,7 +126,7 @@
                             </div>
                         </div>
                         <div class="header-actions">
-                            <span class="badge warning" id="detail-status">...</span>
+                            <span id="detail-status-badge">...</span>
                             <button id="btn-start-review" class="btn btn-primary hidden">Start Review</button>
                         </div>
                     </div>
@@ -133,9 +146,9 @@
                         <div id="unlock-required-overlay" class="unlock-overlay hidden">
                             <div class="unlock-message">
                                 <span class="unlock-icon">🔒</span>
-                                <h4>Local Secure Unlock Required</h4>
+                                <h4 id="unlock-title">Local Secure Unlock Required</h4>
                                 <p>This view contains sensitive local-only data.</p>
-                                <button id="btn-request-unlock" class="btn btn-primary">Unlock with Touch ID</button>
+                                <button id="btn-request-unlock" class="btn btn-primary">Authenticate to Unlock</button>
                             </div>
                         </div>
 
@@ -184,9 +197,16 @@
                             <span id="settings-unlock-ttl">...</span>
                         </div>
                         <div class="info-item vertical">
+                            <label>Test Authentication</label>
+                            <p style="font-size: 12px; color: var(--color-muted); margin-bottom: 8px;">
+                                Trigger a local authentication prompt to verify Secure Unlock is wired correctly.
+                            </p>
+                            <button id="btn-test-unlock" class="btn btn-secondary">Test Local Secure Unlock</button>
+                        </div>
+                        <div class="info-item vertical">
                             <label>Security Note</label>
                             <p style="font-size: 13px; color: var(--color-muted); margin-top: 4px;">
-                                Local Secure Unlock uses macOS LocalAuthentication (Touch ID/Passcode) to gate access to decrypted quote data.
+                                Local Secure Unlock uses macOS LocalAuthentication (Touch ID, Apple Watch, or Passcode) to gate access to decrypted quote data.
                                 This is managed by the native Intake shell.
                             </p>
                         </div>

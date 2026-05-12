@@ -18,52 +18,52 @@ class LocalAuthorizationWindow:
     - It can be manually cleared (locked).
     - It is NOT cryptographically bound to a secret yet (Scaffold phase).
     """
-    
+
     _instance: Optional["LocalAuthorizationWindow"] = None
-    
+
     def __init__(self):
-        self._unlocked_until: Optional[datetime] = None
-    
+        self._unlocked_until: datetime | None = None
+
     @classmethod
     def get_instance(cls) -> "LocalAuthorizationWindow":
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-    
+
     def unlock(self) -> datetime:
         """Refresh the authorization window."""
         settings = get_settings()
         ttl = settings.intake_local_unlock_ttl_seconds
-        
+
         expiry = datetime.now(timezone.utc) + timedelta(seconds=ttl)
         self._unlocked_until = expiry
-        
+
         logger.info(f"LocalAuthorizationWindow: Unlocked until {expiry}")
         return expiry
-    
+
     def lock(self):
         """Immediately clear the authorization window."""
         self._unlocked_until = None
         logger.info("LocalAuthorizationWindow: Locked.")
-    
+
     @property
     def is_unlocked(self) -> bool:
         """Check if the window is currently open and not expired."""
         if self._unlocked_until is None:
             return False
-        
+
         if datetime.now(timezone.utc) > self._unlocked_until:
             self.lock()
             return False
-            
+
         return True
-    
+
     @property
     def remaining_seconds(self) -> float:
         """Get remaining time in the window."""
         if not self.is_unlocked:
             return 0.0
-        
+
         delta = self._unlocked_until - datetime.now(timezone.utc)
         return max(0.0, delta.total_seconds())
 

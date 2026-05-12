@@ -6,7 +6,12 @@ struct LocalConsoleWebView: NSViewRepresentable {
     let reloadTrigger: Int
     
     func makeNSView(context: Context) -> WKWebView {
-        let userScript = WKUserScript(source: "document.body.classList.add('native-shell');", injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        let biometryType = SecureUnlockService.shared.getBiometryType()
+        let scriptSource = """
+            document.body.classList.add('native-shell');
+            window.intakeBiometryType = '\(biometryType)';
+        """
+        let userScript = WKUserScript(source: scriptSource, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         let contentController = WKUserContentController()
         contentController.addUserScript(userScript)
         contentController.add(context.coordinator, name: "requestSecureUnlock")

@@ -1,6 +1,7 @@
+from datetime import datetime
+
 import pytest
 from fastapi.testclient import TestClient
-from datetime import datetime
 
 from intake.local_console.app import app
 from intake.local_console.review_service import LocalDecryptedQuoteReview, UploadEvidence
@@ -16,7 +17,7 @@ def test_status_endpoint_redaction():
     response = client.get("/api/local/status")
     assert response.status_code == 200
     data = response.json()
-    
+
     # Ensure sensitive settings are not leaked as raw values
     # (The API returns boolean flags, not the keys themselves)
     assert "hosted_url" in data
@@ -46,17 +47,17 @@ def test_quote_review_model_redaction():
             )
         ]
     )
-    
+
     data = review.model_dump()
     # Ensure no secret fields were added accidentally
     allowed_keys = {
-        "quote_id", "status", "service_lane", "general_service_area", 
-        "created_at", "updated_at", "email_verified", "upload_count", 
-        "is_decrypted", "is_locked", "exact_location", "access_notes", 
+        "quote_id", "status", "service_lane", "general_service_area",
+        "created_at", "updated_at", "email_verified", "upload_count",
+        "is_decrypted", "is_locked", "exact_location", "access_notes",
         "questionnaire_answers", "upload_evidence"
     }
     assert set(data.keys()).issubset(allowed_keys)
-    
+
     # Ensure evidence doesn't have local paths
     for ev in data["upload_evidence"]:
         assert "storage_ref" not in ev
@@ -64,8 +65,9 @@ def test_quote_review_model_redaction():
 
 @pytest.fixture(autouse=True)
 def setup_settings():
-    from intake.config import get_settings, reset_settings
     from pydantic import SecretStr
+
+    from intake.config import get_settings, reset_settings
     from intake.services.signing_service import LocalDeviceSigningService
     settings = get_settings()
     # Generate a real Ed25519 key string
@@ -78,7 +80,7 @@ def test_get_quotes_pending_api(monkeypatch):
     # Mock the service to avoid network calls
     from intake.local_console.review_service import LocalQuoteReviewService
     from intake.sync.models import HostedQuoteProjection
-    
+
     def mock_get_pending(self):
         return [
             HostedQuoteProjection(
@@ -92,9 +94,9 @@ def test_get_quotes_pending_api(monkeypatch):
                 decrypted=True
             )
         ]
-    
+
     monkeypatch.setattr(LocalQuoteReviewService, "get_pending_reviews", mock_get_pending)
-    
+
     response = client.get("/api/local/quotes/pending")
     assert response.status_code == 200
     assert len(response.json()) == 1

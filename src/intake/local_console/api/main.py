@@ -1,16 +1,14 @@
 """Local-only API for the Intake Console."""
 
+
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Any, Optional
 from pydantic import BaseModel
 
 from intake.config import get_settings
-from intake.local_console.sync_client import LocalSyncClient
-from intake.local_console.review_service import LocalQuoteReviewService, LocalDecryptedQuoteReview
-from intake.sync.models import HostedQuoteProjection
-from intake.deploy.registry import list_supported_providers
 from intake.local_console.receiver.models import ReceiverAvailabilityStatus
 from intake.local_console.receiver.service import LocalReceiverService
+from intake.local_console.review_service import LocalDecryptedQuoteReview, LocalQuoteReviewService
+from intake.sync.models import HostedQuoteProjection
 
 router = APIRouter()
 
@@ -23,10 +21,10 @@ async def health():
 
 
 # Receiver service singleton
-_receiver_service: Optional[LocalReceiverService] = None
+_receiver_service: LocalReceiverService | None = None
 
 
-def get_receiver_service() -> Optional[LocalReceiverService]:
+def get_receiver_service() -> LocalReceiverService | None:
     """Get the receiver service instance."""
     global _receiver_service
     if _receiver_service is None:
@@ -49,18 +47,18 @@ class LocalStatusResponse(BaseModel):
     local_unlock_required: bool
     local_unlock_ttl: int
     # Tunnel adapter status
-    tunnel_adapter_status: Optional[str] = "not_configured"
-    tailscale_funnel_status: Optional[str] = None
-    cloudflare_tunnel_status: Optional[str] = None
+    tunnel_adapter_status: str | None = "not_configured"
+    tailscale_funnel_status: str | None = None
+    cloudflare_tunnel_status: str | None = None
 
 
 class ProviderStatusResponse(BaseModel):
     """Status of a single provider (e.g., Railway)."""
     provider: str
     cli_present: bool
-    cli_version: Optional[str] = None
-    authenticated: Optional[bool] = None
-    project_linked: Optional[bool] = None
+    cli_version: str | None = None
+    authenticated: bool | None = None
+    project_linked: bool | None = None
     ready_status: str = "not_ready"  # "not_ready", "cli_missing", "ready_for_setup", "fully_ready"
     blocking_issues: list[str] = []
 
@@ -70,7 +68,7 @@ class DeployReadinessResponse(BaseModel):
     status: str = "dry_run_only"  # "not_configured", "dry_run_only", "ready", "deployed"
     railway: ProviderStatusResponse
     upload_receiver_configured: bool = True  # Local receiver is now configured
-    upload_receiver_status: Optional[str] = "online"
+    upload_receiver_status: str | None = "online"
     upload_receiver_loopback_only: bool = True
     fallback_storage_configured: bool = False
     # Tunnel adapter status
@@ -87,9 +85,9 @@ class RailwayDryRunPlanResponse(BaseModel):
     """Response containing Railway dry-run plan details."""
     plan_id: str
     railway_cli_present: bool
-    railway_cli_version: Optional[str] = None
-    railway_authenticated: Optional[bool] = None
-    railway_project_linked: Optional[bool] = None
+    railway_cli_version: str | None = None
+    railway_authenticated: bool | None = None
+    railway_project_linked: bool | None = None
     blocking_issues: list[str] = []
     warnings: list[str] = []
     next_manual_steps: list[str] = []
@@ -101,7 +99,7 @@ class RailwayDryRunPlanResponse(BaseModel):
 async def get_status():
     """Get status of the local console."""
     settings = get_settings()
-    
+
     # Get tunnel adapter status
     tailscale_status = None
     cloudflare_status = None
@@ -115,7 +113,7 @@ async def get_status():
             cloudflare_status = plans.cloudflare.readiness.value
     except Exception:
         pass
-    
+
     # Redact tokens/keys: only show if they exist
     return LocalStatusResponse(
         hosted_url=settings.intake_base_url,
@@ -136,18 +134,18 @@ def _get_railway_status() -> ProviderStatusResponse:
     try:
         # Import here to avoid issues if module is not available
         from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
-        
+
         service = RailwayDryRunBootstrapService()
-        
+
         # Check CLI
         cli = service.check_railway_cli()
-        
+
         # Check auth
         auth = service.check_railway_project()
-        
+
         # Build dry-run plan for status
         plan = service.build_dry_run_plan(include_artifacts=False)
-        
+
         if not cli.present:
             return ProviderStatusResponse(
                 provider="railway",
@@ -158,10 +156,10 @@ def _get_railway_status() -> ProviderStatusResponse:
                 ready_status="cli_missing",
                 blocking_issues=["Railway CLI not installed"]
             )
-        
+
         is_ready = plan.is_ready if auth.linked else False
         is_setup_ready = plan.can_attempt_deployment
-        
+
         return ProviderStatusResponse(
             provider="railway",
             cli_present=True,
@@ -185,21 +183,21 @@ def _get_railway_status() -> ProviderStatusResponse:
 async def get_deploy_status():
     """Get deployment provider readiness status."""
     railway_status = _get_railway_status()
-    
+
     # Get receiver status
     receiver_svc = get_receiver_service()
     if receiver_svc:
         receiver_status = receiver_svc.get_availability().status.value
     else:
         receiver_status = "not_configured"
-    
+
     if railway_status.cli_present and railway_status.ready_status == "fully_ready":
         recommended = "review_and_deploy"
     elif railway_status.cli_present:
         recommended = "link_project"
     else:
         recommended = "install_railway_cli"
-    
+
     # Get tunnel adapter status
     tailscale_status = None
     cloudflare_status = None
@@ -213,7 +211,7 @@ async def get_deploy_status():
             cloudflare_status = plans.cloudflare.readiness.value
     except Exception:
         pass
-    
+
     return DeployReadinessResponse(
         status="dry_run_only",
         railway=railway_status,
@@ -262,17 +260,17 @@ async def get_tunnel_dry_run_plan(provider: str):
     NO commands are executed or activated.
     """
     try:
-        from intake.deploy.tunnel_adapters.models import TunnelProviderKind
         from intake.deploy.tunnel_adapters import get_tunnel_adapter_service
-        
+        from intake.deploy.tunnel_adapters.models import TunnelProviderKind
+
         tunnel_svc = get_tunnel_adapter_service()
-        
+
         # Validate provider
         try:
             provider_enum = TunnelProviderKind(provider)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Unknown tunnel provider: {provider}")
-        
+
         plan = tunnel_svc.generate_dry_run_plan(provider_enum, receiver_port=8001)
         return plan
     except Exception as e:
@@ -288,10 +286,10 @@ async def get_railway_dry_run_plan():
     """
     try:
         from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
-        
+
         service = RailwayDryRunBootstrapService()
         plan = service.build_dry_run_plan(include_artifacts=False)
-        
+
         return RailwayDryRunPlanResponse(
             plan_id=plan.plan_id,
             railway_cli_present=plan.railway_cli_present,
@@ -307,7 +305,7 @@ async def get_railway_dry_run_plan():
         return RailwayDryRunPlanResponse(
             plan_id="error",
             railway_cli_present=False,
-            warnings=[f"Dry-run plan generation failed: {str(e)}"]
+            warnings=[f"Dry-run plan generation failed: {e!s}"]
         )
 
 def get_local_review_service() -> LocalQuoteReviewService:

@@ -11,25 +11,23 @@ Bound to 127.0.0.1 only.
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.security import HTTPBearer
-from typing import Annotated, Optional
 
 from intake.local_console.receiver.models import (
     LocalUploadCompleteReceipt,
     LocalUploadReceipt,
     LocalUploadSession,
     LocalUploadSessionCreate,
+    ReceiverAvailabilityStatus,
     ReceiverHandshakeChallenge,
     ReceiverHandshakeResponse,
-    ReceiverAvailabilityStatus,
     SessionCompleteRequest,
     UploadFileRequest,
-    UploadRejectionResponse,
 )
 from intake.local_console.receiver.service import LocalReceiverService
-from intake.local_console.receiver.storage import get_storage_service
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +62,7 @@ def create_receiver_app() -> FastAPI:
     """
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    
+
     app = FastAPI(
         title="Intake Local Receiver",
         description="Local loopback upload receiver for Intake. Separate from Local Console.",
@@ -73,7 +71,7 @@ def create_receiver_app() -> FastAPI:
         docs_url="/receiver/docs" if True else None,
         redoc_url="/receiver/redoc" if True else None,
     )
-    
+
     # CORS - very restrictive for local dev
     app.add_middleware(
         CORSMiddleware,
@@ -82,9 +80,9 @@ def create_receiver_app() -> FastAPI:
         allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
-    
+
     app.include_router(router)
-    
+
     return app
 
 
@@ -114,7 +112,7 @@ async def health_check_post(
 
 @router.post("/handshake", response_model=ReceiverHandshakeResponse)
 async def handshake(
-    challenge: Optional[ReceiverHandshakeChallenge] = None,
+    challenge: ReceiverHandshakeChallenge | None = None,
     service: LocalReceiverService = Depends(get_receiver_service),
 ) -> ReceiverHandshakeResponse:
     """Perform receiver handshake.
@@ -173,7 +171,7 @@ async def upload_file(
     session_id: str,
     file: Annotated[UploadFile, File()],
     declared_content_type: Annotated[str, Form()],
-    original_filename: Annotated[Optional[str], Form()] = None,
+    original_filename: Annotated[str | None, Form()] = None,
     service: LocalReceiverService = Depends(get_receiver_service),
 ) -> LocalUploadReceipt:
     """Upload a file to the receiver.
@@ -201,7 +199,7 @@ async def upload_file(
         declared_content_type=declared_content_type,
         original_filename=original_filename,
     )
-    
+
     # Read file content
     try:
         file_content = file.file.read()
@@ -211,14 +209,14 @@ async def upload_file(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to read file content",
         )
-    
+
     # Process upload
     file_record, rejection = service.process_file_upload(
         session_id=session_id,
         request=upload_request,
         file_content=file_content,
     )
-    
+
     # Check for rejection
     if rejection:
         raise HTTPException(
@@ -229,7 +227,7 @@ async def upload_file(
                 "session_id": rejection.session_id,
             },
         )
-    
+
     # Build public-safe receipt
     receipt = LocalUploadReceipt(
         upload_id=service.storage.generate_upload_id(),
@@ -243,7 +241,7 @@ async def upload_file(
         stored_at=file_record.stored_at,
         storage_provider=file_record.storage_provider,
     )
-    
+
     return receipt
 
 
@@ -252,7 +250,7 @@ async def upload_file_stream(
     session_id: str,
     file: Annotated[UploadFile, File()],
     declared_content_type: Annotated[str, Form()],
-    original_filename: Annotated[Optional[str], Form()] = None,
+    original_filename: Annotated[str | None, Form()] = None,
     service: LocalReceiverService = Depends(get_receiver_service),
 ) -> LocalUploadReceipt:
     """Upload a file with streaming (experimental).
@@ -265,14 +263,14 @@ async def upload_file_stream(
         declared_content_type=declared_content_type,
         original_filename=original_filename,
     )
-    
+
     # Process with streaming
     file_record, rejection = service.process_streamed_file_upload(
         session_id=session_id,
         request=upload_request,
         file_obj=file.file,
     )
-    
+
     if rejection:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -282,7 +280,7 @@ async def upload_file_stream(
                 "session_id": rejection.session_id,
             },
         )
-    
+
     receipt = LocalUploadReceipt(
         upload_id=service.storage.generate_upload_id(),
         session_id=file_record.session_id,
@@ -295,7 +293,7 @@ async def upload_file_stream(
         stored_at=file_record.stored_at,
         storage_provider=file_record.storage_provider,
     )
-    
+
     return receipt
 
 
@@ -315,7 +313,7 @@ async def complete_upload_session(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="session_id mismatch in request body",
         )
-    
+
     try:
         receipt = service.complete_session(request)
         return receipt
@@ -339,15 +337,15 @@ async def get_session_receipt(
         session = service.get_session(session_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    
+
     from intake.local_console.receiver.models import SessionCompleteRequest
-    
+
     # Build a complete request to generate receipt
     complete_req = SessionCompleteRequest(
         session_id=session_id,
         quote_id=session.quote_id,
     )
-    
+
     try:
         receipt = service.complete_session(complete_req)
         return receipt
@@ -374,24 +372,23 @@ def run_receiver_server(host: str = "127.0.0.1", port: int = 8001, log_level: st
         log_level: Logging level
     """
     import uvicorn
-    from fastapi import FastAPI
-    
+
     # Validate loopback-only
     if host not in ("127.0.0.1", "localhost", "::1"):
-        logger.warning(f"Receiver should only bind to loopback. Normalizing host to 127.0.0.1")
+        logger.warning("Receiver should only bind to loopback. Normalizing host to 127.0.0.1")
         host = "127.0.0.1"
-    
+
     # Create app
     app = create_receiver_app()
-    
+
     # Configure logging
     import logging as log_module
     log_module.basicConfig(level=getattr(log_module, log_level.upper(), log_module.INFO))
-    
+
     logger.info(f"Starting Local Receiver on {host}:{port}")
     logger.info("Receiver is LOOPBACK ONLY - bound to 127.0.0.1")
     logger.info("Endpoints: /receiver/health, /receiver/handshake, /receiver/uploads/*")
-    
+
     uvicorn.run(
         app,
         host=host,

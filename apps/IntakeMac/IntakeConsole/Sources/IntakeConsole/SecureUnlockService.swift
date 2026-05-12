@@ -7,6 +7,29 @@ class SecureUnlockService {
     
     private init() {}
     
+    /// Returns the available biometry type on the device.
+    func getBiometryType() -> String {
+        let context = LAContext()
+        var error: NSError?
+        
+        // We check with deviceOwnerAuthentication to see what's available
+        if context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) {
+            switch context.biometryType {
+            case .touchID:
+                return "touchID"
+            case .faceID:
+                return "faceID"
+            case .opticID:
+                return "opticID"
+            case .none:
+                return "passcode"
+            @unknown default:
+                return "unknown"
+            }
+        }
+        return "unavailable"
+    }
+    
     /// Requests a local secure unlock using biometrics (Touch ID/Face ID) or device passcode.
     /// - Parameter reason: The localized reason shown to the user in the auth prompt.
     /// - Returns: An UnlockResult indicating success or failure.

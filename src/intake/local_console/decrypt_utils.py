@@ -3,7 +3,6 @@
 import json
 from typing import Any
 
-from intake.config import get_settings
 from intake.domain.crypto import EncryptedPayload
 from intake.services.crypto_service import get_crypto_service
 from intake.storage.repositories import QuoteRepository

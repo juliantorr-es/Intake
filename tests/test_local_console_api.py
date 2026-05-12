@@ -1,18 +1,19 @@
 """Tests for the local-only console API."""
 
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock
 from pydantic import SecretStr
 
-from intake.local_console.app import app
 from intake.config import get_settings, reset_settings
-from intake.local_console.review_service import LocalQuoteReviewService, LocalDecryptedQuoteReview
+from intake.local_console.app import app
+from intake.local_console.review_service import LocalDecryptedQuoteReview, LocalQuoteReviewService
 from intake.sync.models import HostedQuoteProjection
+
 
 @pytest.fixture(autouse=True)
 def setup_settings():
-    from intake.config import reset_settings
     yield
     reset_settings()
 
@@ -33,14 +34,14 @@ def test_local_status_redaction(client):
     settings = get_settings()
     settings.intake_local_sync_token = SecretStr("secret-token")
     settings.intake_dev_encryption_key = SecretStr("secret-key")
-    
+
     response = client.get("/api/local/status")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["sync_auth_configured"] is True
     assert data["encryption_key_configured"] is True
-    
+
     # Ensure raw values are NOT present
     assert "secret-token" not in str(data)
     assert "secret-key" not in str(data)
@@ -57,7 +58,7 @@ def test_local_pending_quotes(client, mock_review_service):
             upload_count=0
         )
     ]
-    
+
     response = client.get("/api/local/quotes/pending")
     assert response.status_code == 200
     assert len(response.json()) == 1
@@ -74,10 +75,10 @@ def test_local_quote_review_decrypted(client, mock_review_service):
         exact_location="123 Decrypted St",
         access_notes="Door code 1234"
     )
-    
+
     response = client.get("/api/local/quotes/q1/review")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["exact_location"] == "123 Decrypted St"
     assert data["access_notes"] == "Door code 1234"

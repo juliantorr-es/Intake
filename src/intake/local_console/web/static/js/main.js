@@ -46,6 +46,31 @@ async function initApp() {
             }
         }
     }
+
+    // New Listeners
+    document.getElementById('btn-test-unlock')?.addEventListener('click', requestSecureUnlock);
+    document.getElementById('btn-seed-demo')?.addEventListener('click', seedDemoData);
+    
+    // Update labels based on biometry type
+    updateBiometryLabels();
+}
+
+function updateBiometryLabels() {
+    const type = window.intakeBiometryType || 'passcode';
+    const labels = {
+        'touchID': 'Touch ID',
+        'faceID': 'Face ID',
+        'opticID': 'Optic ID',
+        'passcode': 'macOS Password',
+        'unavailable': 'Local Authentication'
+    };
+    const label = labels[type] || 'Local Authentication';
+    
+    const unlockBtn = document.getElementById('btn-request-unlock');
+    if (unlockBtn) unlockBtn.textContent = `Unlock with ${label}`;
+    
+    const testBtn = document.getElementById('btn-test-unlock');
+    if (testBtn) testBtn.textContent = `Test ${label} Unlock`;
 }
 
 function showView(viewId) {
@@ -57,11 +82,23 @@ function showView(viewId) {
     // Update title
     const titles = {
         'view-dashboard': 'Dashboard',
-        'view-quotes': 'Pending Quotes',
+        'view-quotes': 'Pending Reviews',
         'view-quote-detail': 'Quote Review',
         'view-settings': 'Settings'
     };
     document.getElementById('page-title').textContent = titles[viewId] || 'Console';
+}
+
+function getStatusBadge(status) {
+    const classes = {
+        'submitted': 'info',
+        'needs_review': 'warning',
+        'reviewing': 'private',
+        'approved': 'success',
+        'rejected': 'error'
+    };
+    const cls = classes[status] || 'private';
+    return `<span class="badge ${cls}">${status.toUpperCase()}</span>`;
 }
 
 async function updateStatus() {
@@ -100,58 +137,118 @@ async function updateStatus() {
     }
 }
 
+let quotesData = [];
+
 async function loadPendingQuotes() {
     try {
         const response = await fetch('/api/local/quotes/pending');
-        const quotes = await response.json();
-        
-        document.getElementById('stat-pending-count').textContent = quotes.length;
-        
-        const tbody = document.getElementById('quote-list-body');
-        tbody.innerHTML = '';
-        
-        quotes.forEach(quote => {
-            const tr = document.createElement('tr');
-            
-            const cells = [
-                quote.quote_id,
-                quote.status,
-                quote.general_service_area || 'N/A',
-                quote.upload_count.toString()
-            ];
-            
-            cells.forEach(text => {
-                const td = document.createElement('td');
-                td.textContent = text;
-                tr.appendChild(td);
-            });
-            
-            const actionTd = document.createElement('td');
-            const btn = document.createElement('button');
-            btn.className = 'btn';
-            btn.textContent = 'Review';
-            btn.onclick = () => showQuoteDetail(quote.quote_id);
-            actionTd.appendChild(btn);
-            tr.appendChild(actionTd);
-            
-            tbody.appendChild(tr);
-        });
+        quotesData = await response.json();
+        renderQuotes(quotesData);
     } catch (err) {
         console.error('Failed to load quotes:', err);
         const tbody = document.getElementById('quote-list-body');
         if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--state-error);">Hosted backend unavailable or sync failed.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--state-error);">Hosted backend unavailable or sync failed.</td></tr>';
         }
     }
 }
 
+function renderQuotes(quotes) {
+    document.getElementById('stat-pending-count').textContent = quotes.length;
+    
+    const tbody = document.getElementById('quote-list-body');
+    const emptyState = document.getElementById('quote-empty-state');
+    
+    tbody.innerHTML = '';
+    
+    if (quotes.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+    }
+    
+    emptyState.classList.add('hidden');
+    
+    quotes.forEach(quote => {
+        const tr = document.createElement('tr');
+        
+        const createdDate = quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'N/A';
+        
+        tr.innerHTML = `
+            <td>
+                <div style="font-weight: 600; font-family: var(--font-mono); font-size: 13px;">${quote.quote_id}</div>
+                ${quote.email_verified ? '<span style="font-size: 10px; color: var(--state-ok);">✓ Email Verified</span>' : ''}
+            </td>
+            <td>${getStatusBadge(quote.status)}</td>
+            <td>
+                <div style="font-size: 13px;">${quote.service_lane || 'GENERAL'}</div>
+                <div style="font-size: 11px; color: var(--color-muted);">${quote.general_service_area || 'N/A'}</div>
+            </td>
+            <td style="font-size: 12px; color: var(--color-muted);">${createdDate}</td>
+            <td style="font-family: var(--font-mono); font-size: 12px;">${quote.upload_count}</td>
+            <td style="text-align: right;">
+                <button class="btn btn-secondary" onclick="showQuoteDetail('${quote.quote_id}')">Review</button>
+            </td>
+        `;
+        
+        tbody.appendChild(tr);
+    });
+}
+
+function seedDemoData() {
+    const demoQuotes = [
+        {
+            quote_id: "QT-DEMO-001",
+            status: "needs_review",
+            service_lane: "COMMERCIAL",
+            general_service_area: "San Francisco, CA",
+            created_at: new Date().toISOString(),
+            upload_count: 3,
+            email_verified: true,
+            has_encrypted_payload: true,
+            decrypted: false
+        },
+        {
+            quote_id: "QT-DEMO-002",
+            status: "submitted",
+            service_lane: "RESIDENTIAL",
+            general_service_area: "Austin, TX",
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+            upload_count: 1,
+            email_verified: false,
+            has_encrypted_payload: true,
+            decrypted: false
+        }
+    ];
+    quotesData = demoQuotes;
+    renderQuotes(demoQuotes);
+    alert('Demo data seeded. (Local UI only, will reset on refresh)');
+}
+
 async function showQuoteDetail(quoteId) {
     try {
-        const response = await fetch(`/api/local/quotes/${quoteId}/review`);
-        const detail = await response.json();
+        // First try to find in local seed data
+        let detail = quotesData.find(q => q.quote_id === quoteId);
+        
+        // If not in seed data or we want real data, fetch it
+        if (!detail || !detail.quote_id.startsWith('QT-DEMO')) {
+            const response = await fetch(`/api/local/quotes/${quoteId}/review`);
+            detail = await response.json();
+        } else {
+            // Mock detail for demo data
+            detail = {
+                ...detail,
+                is_locked: true,
+                exact_location: "123 Demo St, San Francisco",
+                access_notes: "Code 1234 on front gate",
+                questionnaire_answers: { "property_type": "Office", "urgency": "High" },
+                upload_evidence: [
+                    { file_id: "f1", original_filename: "site_photo_1.jpg", size_bytes: 1024000, content_type: "image/jpeg", sha256: "abc", storage_provider: "local" }
+                ]
+            };
+        }
         
         document.getElementById('detail-quote-id').textContent = `Quote ${detail.quote_id}`;
-        document.getElementById('detail-status').textContent = detail.status.toUpperCase();
+        document.getElementById('detail-status-badge').innerHTML = getStatusBadge(detail.status);
         document.getElementById('detail-lane').textContent = detail.service_lane || 'GENERAL';
         document.getElementById('detail-area').textContent = detail.general_service_area || 'N/A';
         document.getElementById('detail-email-verified').classList.toggle('hidden', !detail.email_verified);

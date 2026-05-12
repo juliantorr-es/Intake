@@ -1,18 +1,18 @@
 """Main entrypoint for the Local Intake Console window app."""
 
+import os
+import socket
 import threading
+
 import uvicorn
 import webview
-import socket
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from fastapi import Request
-import os
-import sys
 
 from intake.local_console.api import router as api_router
+
 
 def find_free_port():
     """Find a free port on localhost."""
@@ -86,10 +86,10 @@ def main():
         port = int(env_port)
     else:
         port = find_free_port()
-    
+
     url = f"http://127.0.0.1:{port}"
     headless = os.environ.get("INTAKE_HEADLESS") == "1"
-    
+
     if headless:
         print(f"Local Console Server started in HEADLESS mode at {url}")
         run_server(port)
@@ -97,9 +97,9 @@ def main():
         # Start server in a background thread
         server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
         server_thread.start()
-        
+
         print(f"Local Console Server started at {url}")
-        
+
         # Create pywebview window
         webview.create_window(
             "Intake Local Console",
@@ -108,10 +108,10 @@ def main():
             height=768,
             min_size=(800, 600)
         )
-        
+
         # Start webview loop (this blocks until window closed)
         webview.start()
-        
+
         print("Local Console closed.")
 
 if __name__ == "__main__":

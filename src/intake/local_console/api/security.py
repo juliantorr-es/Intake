@@ -1,8 +1,7 @@
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from intake.local_console.security.unlock import get_auth_window, LocalAuthorizationWindow
+from intake.local_console.security.unlock import LocalAuthorizationWindow, get_auth_window
 
 router = APIRouter(prefix="/security", tags=["security"])
 
@@ -34,7 +33,7 @@ async def perform_unlock(
     if client_host not in ["127.0.0.1", "::1", "localhost"]:
          # This should be blocked by server binding anyway, but defense in depth
          raise HTTPException(status_code=403, detail="Unlock only permitted from loopback")
-         
+
     auth_window.unlock()
     return UnlockStatus(
         is_unlocked=auth_window.is_unlocked,

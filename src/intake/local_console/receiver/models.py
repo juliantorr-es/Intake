@@ -4,12 +4,12 @@ These models define the request/response structures for the local receiver API.
 The Local Receiver is separate from the Local Console.
 """
 
+import secrets
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Optional
-from pydantic import BaseModel, Field, ConfigDict
-import secrets
+from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
 
 # =============================================================================
 # Enums
@@ -84,7 +84,7 @@ class ReceiverHandshakeChallenge(BaseModel):
             "expected_capabilities": ["DIRECT_UPLOAD", "STREAMING_UPLOAD"],
         }]
     })
-    
+
     challenge_token: str = Field(default_factory=lambda: secrets.token_hex(16))
     expected_protocols: list[str] = ["multipart"]
     expected_capabilities: list[str] = ["DIRECT_UPLOAD", "STREAMING_UPLOAD"]
@@ -109,7 +109,7 @@ class ReceiverHandshakeResponse(BaseModel):
             "local_url": "http://127.0.0.1:8001/receiver",
         }]
     })
-    
+
     receiver_id: str
     status: ReceiverStatus
     supported_protocols: list[str] = ["multipart"]
@@ -121,7 +121,7 @@ class ReceiverHandshakeResponse(BaseModel):
     expires_at: datetime
     receiver_version: str = "0.1.0"
     # Only exposed in local-dev mode, never in production
-    local_url: Optional[str] = None
+    local_url: str | None = None
 
 
 class ReceiverRegistration(BaseModel):
@@ -143,12 +143,12 @@ class ReceiverAvailabilityStatus(BaseModel):
             "loopback_only": True,
         }]
     })
-    
+
     receiver_id: str
     status: ReceiverStatus
     bind_address_redacted: bool = True
     loopback_only: bool = True
-    health_check_at: Optional[datetime] = None
+    health_check_at: datetime | None = None
 
 
 # =============================================================================
@@ -168,9 +168,9 @@ class LocalUploadSessionCreate(BaseModel):
             "max_files": 20,
         }]
     })
-    
+
     quote_id: str
-    account_id: Optional[str] = None  # Can be redacted client reference
+    account_id: str | None = None  # Can be redacted client reference
     expires_at: datetime
     allowed_content_types: list[str] = list(ALLOWED_CONTENT_TYPES.keys())
     allowed_extensions: list[str] = ALLOWED_EXTENSIONS_LIST
@@ -178,16 +178,16 @@ class LocalUploadSessionCreate(BaseModel):
     max_files: int = DEFAULT_MAX_FILES_PER_SESSION
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES_PER_SESSION
     # One-time token hash for session validation
-    one_time_token_hash: Optional[str] = None
+    one_time_token_hash: str | None = None
 
 
 class LocalUploadSession(BaseModel):
     """An upload session on the local receiver."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     session_id: str
     quote_id: str
-    account_id: Optional[str] = None
+    account_id: str | None = None
     status: SessionStatus = SessionStatus.PENDING
     created_at: datetime = Field(default_factory=datetime.utcnow)
     expires_at: datetime
@@ -198,7 +198,7 @@ class LocalUploadSession(BaseModel):
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES_PER_SESSION
     uploaded_files: list[str] = []  # List of file IDs
     total_bytes_uploaded: int = 0
-    one_time_token_hash: Optional[str] = None
+    one_time_token_hash: str | None = None
 
 
 # =============================================================================
@@ -208,13 +208,13 @@ class LocalUploadSession(BaseModel):
 class LocalUploadedFileRecord(BaseModel):
     """Record of a file uploaded to the local receiver."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     file_id: str
     session_id: str
     quote_id: str
     original_filename_redacted: bool = True  # Original filename is NOT stored in path
     declared_content_type: str
-    detected_content_type: Optional[str] = None
+    detected_content_type: str | None = None
     extension: str
     size_bytes: int
     sha256: str
@@ -229,7 +229,7 @@ class UploadFileRequest(BaseModel):
     """Metadata for file upload (accompanies multipart file)."""
     session_id: str
     declared_content_type: str
-    original_filename: Optional[str] = None  # Not used in storage path
+    original_filename: str | None = None  # Not used in storage path
 
 
 # =============================================================================
@@ -255,7 +255,7 @@ class LocalUploadReceipt(BaseModel):
             "storage_provider": "local_loopback_dev",
         }]
     })
-    
+
     upload_id: str
     session_id: str
     quote_id: str
@@ -272,7 +272,7 @@ class LocalUploadReceipt(BaseModel):
 class LocalUploadCompleteReceipt(BaseModel):
     """Receipt for a completed upload session."""
     model_config = ConfigDict(from_attributes=True)
-    
+
     session_id: str
     quote_id: str
     total_files: int
@@ -296,9 +296,9 @@ class UploadValidationError(BaseModel):
     """Details about a file validation failure."""
     error_code: str
     error_message: str
-    field: Optional[str] = None
-    rejected_value: Optional[str] = None
-    details: Optional[dict[str, Any]] = None
+    field: str | None = None
+    rejected_value: str | None = None
+    details: dict[str, Any] | None = None
 
 
 class FileRejectionReason(StrEnum):
@@ -321,6 +321,6 @@ class UploadRejectionResponse(BaseModel):
     rejected: bool = True
     reason: FileRejectionReason
     error_message: str
-    session_id: Optional[str] = None
-    file_id: Optional[str] = None
-    details: Optional[dict[str, Any]] = None
+    session_id: str | None = None
+    file_id: str | None = None
+    details: dict[str, Any] | None = None

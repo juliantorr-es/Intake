@@ -36,7 +36,7 @@ from intake.domain.time import utc_now
 
 class ProofRailEventType(str):
     """Types of events in the Proof Rail."""
-    
+
     # Quote events
     QUOTE_CREATED = "quote_created"
     QUOTE_SUBMITTED = "quote_submitted"
@@ -44,26 +44,26 @@ class ProofRailEventType(str):
     QUOTE_REVIEW_STARTED = "quote_review_started"
     QUOTE_UPLOAD_DECLARED = "quote_upload_declared"
     QUOTE_UPLOAD_ACCEPTED = "quote_upload_accepted"
-    
+
     # Upload broker events
     UPLOAD_SESSION_CREATED = "upload_session_created"
     UPLOAD_SESSION_EXPIRED = "upload_session_expired"
     UPLOAD_RECEIPT_RECEIVED = "upload_receipt_received"
-    
+
     # Cost Ledger events
     COST_SCENARIO_CREATED = "cost_scenario_created"
     COST_RECEIPT_GENERATED = "cost_receipt_generated"
     COST_SNAPSHOT_CREATED = "cost_snapshot_created"
-    
+
     # Sync events
     SYNC_STARTED = "sync_started"
     SYNC_COMPLETED = "sync_completed"
     SYNC_FAILED = "sync_failed"
-    
+
     # Deployment events
     DEPLOYMENT_DRY_RUN = "deployment_dry_run"
     TUNNEL_DRY_RUN = "tunnel_dry_run"
-    
+
     # Local actions
     LOCAL_ACTION_VERIFIED = "local_action_verified"
     RECEIVER_HANDSHAKE = "receiver_handshake"
@@ -71,9 +71,9 @@ class ProofRailEventType(str):
 
 class ProofRailSeverity(str):
     """Severity/status levels for Proof Rail events."""
-    
+
     SUCCESS = "success"      # Green - verified/healthy
-    INFO = "info"            # Blue - sync/deploy/provider status  
+    INFO = "info"            # Blue - sync/deploy/provider status
     WARNING = "warning"      # Amber - needs review
     PRIVATE = "private"      # Purple - local-only
     ERROR = "error"          # Red - error/destructive risk
@@ -85,19 +85,19 @@ class ProofRailEvent:
     All fields are carefully redacted. No secrets, tokens, keys,
     or sensitive data are included.
     """
-    
+
     def __init__(
         self,
         event_id: str,
         event_type: str,
         source: str,
-        aggregate_id: Optional[str] = None,
-        aggregate_type: Optional[str] = None,
-        created_at: Optional[datetime] = None,
+        aggregate_id: str | None = None,
+        aggregate_type: str | None = None,
+        created_at: datetime | None = None,
         severity: str = ProofRailSeverity.INFO,
         redacted_summary: str = "",
-        receipt_ref: Optional[str] = None,
-        details: Optional[dict[str, Any]] = None,
+        receipt_ref: str | None = None,
+        details: dict[str, Any] | None = None,
     ):
         self.event_id = event_id
         self.event_type = event_type
@@ -109,7 +109,7 @@ class ProofRailEvent:
         self.redacted_summary = redacted_summary
         self.receipt_ref = receipt_ref
         self.details = details or {}
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Return safe dictionary representation."""
         return {
@@ -124,7 +124,7 @@ class ProofRailEvent:
             "receipt_ref": self.receipt_ref[:16] + "..." if self.receipt_ref and len(self.receipt_ref) > 16 else self.receipt_ref,
             "details": self.details,
         }
-    
+
     def to_list_dict(self) -> dict[str, Any]:
         """Return compact dictionary for list views."""
         return {
@@ -143,21 +143,21 @@ class ProofRail:
     This provides a unified view of operational events for the Local Console,
     allowing operators to see the audit trail of what has happened.
     """
-    
+
     def __init__(
         self,
         quote_service: Optional["QuoteService"] = None,
         upload_broker: Optional["UploadBroker"] = None,
-        cost_calculator: Optional[CostCalculator] = None,
+        cost_calculator: CostCalculator | None = None,
     ):
         self._quote_service = quote_service
         self._upload_broker = upload_broker
         self._cost_calculator = cost_calculator or get_cost_calculator()
-    
+
     def get_events_for_quote(self, quote_id: str) -> list[ProofRailEvent]:
         """Get all proof events related to a specific quote."""
         events = []
-        
+
         # Get quote projections for this quote
         if self._quote_service:
             quote = self._quote_service.get_quote(quote_id)
@@ -171,7 +171,7 @@ class ProofRail:
                     severity=ProofRailSeverity.INFO,
                     redacted_summary=f"Quote {quote_id[:8]}... created",
                 ))
-        
+
         # Get upload sessions for this quote
         if self._upload_broker:
             sessions = self._upload_broker.list_sessions()
@@ -187,7 +187,7 @@ class ProofRail:
                         redacted_summary=f"Upload session for quote {quote_id[:8]}...",
                         receipt_ref=session.session_id,
                     ))
-        
+
         # Get cost receipts for this quote
         receipts = self._cost_calculator.list_receipts()
         for receipt in receipts:
@@ -202,15 +202,15 @@ class ProofRail:
                     redacted_summary=f"Cost receipt generated for quote {quote_id[:8]}...",
                     receipt_ref=receipt.receipt_id,
                 ))
-        
+
         # Sort by created_at descending
         events.sort(key=lambda e: e.created_at, reverse=True)
         return events
-    
+
     def get_all_events(self) -> list[ProofRailEvent]:
         """Get all proof events from all sources."""
         events = []
-        
+
         # Add quote events
         if self._quote_service:
             try:
@@ -227,7 +227,7 @@ class ProofRail:
                     ))
             except Exception:
                 pass  # Graceful degradation
-        
+
         # Add upload sessions
         if self._upload_broker:
             try:
@@ -244,7 +244,7 @@ class ProofRail:
                     ))
             except Exception:
                 pass
-        
+
         # Add cost ledger events
         try:
             # Scenarios
@@ -259,7 +259,7 @@ class ProofRail:
                     severity=ProofRailSeverity.INFO,
                     redacted_summary=f"Cost scenario {scenario.scenario_id[:8]}... created",
                 ))
-            
+
             # Receipts
             receipts = self._cost_calculator.list_receipts()
             for receipt in receipts[:50]:
@@ -273,7 +273,7 @@ class ProofRail:
                     redacted_summary=f"Cost receipt {receipt.receipt_id[:8]}... generated",
                     receipt_ref=receipt.receipt_id,
                 ))
-            
+
             # Snapshots
             snapshots = self._cost_calculator.list_snapshots()
             for snapshot in snapshots[:50]:
@@ -288,26 +288,26 @@ class ProofRail:
                 ))
         except Exception:
             pass
-        
+
         # Sort by created_at descending
         events.sort(key=lambda e: e.created_at, reverse=True)
         return events
-    
+
     def get_events_by_source(self, source: str) -> list[ProofRailEvent]:
         """Get events filtered by source."""
         all_events = self.get_all_events()
         return [e for e in all_events if e.source == source]
-    
+
     def get_events_by_type(self, event_type: str) -> list[ProofRailEvent]:
         """Get events filtered by event type."""
         all_events = self.get_all_events()
         return [e for e in all_events if e.event_type == event_type]
-    
+
     def get_events_by_aggregate(self, aggregate_id: str) -> list[ProofRailEvent]:
         """Get events filtered by aggregate ID."""
         all_events = self.get_all_events()
         return [e for e in all_events if e.aggregate_id == aggregate_id]
-    
+
     def _map_quote_status_to_event(self, status) -> str:
         """Map quote status to proof rail event type."""
         mapping = {
@@ -321,7 +321,7 @@ class ProofRail:
             "closed": ProofRailEventType.QUOTE_SUBMITTED,
         }
         return mapping.get(str(status).lower(), ProofRailEventType.QUOTE_CREATED)
-    
+
     def _quote_status_to_severity(self, status) -> str:
         """Map quote status to severity."""
         mapping = {
@@ -338,7 +338,7 @@ class ProofRail:
 
 
 # Singleton instance
-_proof_rail: Optional[ProofRail] = None
+_proof_rail: ProofRail | None = None
 
 
 def get_proof_rail() -> ProofRail:

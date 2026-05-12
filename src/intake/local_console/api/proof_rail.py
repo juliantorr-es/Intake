@@ -72,7 +72,7 @@ async def get_proof_rail_events(
         events = proof_rail.get_events_by_aggregate(aggregate_id)
     else:
         events = proof_rail.get_all_events()
-    
+
     # Truncate to limit and return list dicts
     return [e.to_list_dict() for e in events[:limit]]
 

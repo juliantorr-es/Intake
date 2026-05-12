@@ -1,14 +1,16 @@
 """Local service for reviewing and decrypting quotes."""
 
-from typing import Any, List, Optional
-from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Any
 
-from intake.sync.models import HostedQuoteProjection, EncryptedQuoteEnvelope
-from intake.local_console.sync_client import LocalSyncClient
-from intake.services.crypto_service import get_crypto_service, CryptoService
-from intake.services.signing_service import LocalDeviceSigningService
+from pydantic import BaseModel, Field
+
 from intake.config import get_settings
+from intake.local_console.sync_client import LocalSyncClient
+from intake.services.crypto_service import CryptoService, get_crypto_service
+from intake.services.signing_service import LocalDeviceSigningService
+from intake.sync.models import HostedQuoteProjection
+
 
 class UploadEvidence(BaseModel):
     """Evidence of a file upload."""
@@ -28,27 +30,27 @@ class LocalDecryptedQuoteReview(BaseModel):
     general_service_area: str | None = None
     created_at: datetime
     updated_at: datetime
-    
+
     # Discovery metadata
     email_verified: bool = False
     upload_count: int = 0
     # Decrypt status
     is_decrypted: bool = False
     is_locked: bool = True
-    
+
     # Decrypted fields (redacted when locked)
     exact_location: str | None = None
     access_notes: str | None = None
     questionnaire_answers: dict[str, Any] | None = None
-    
+
     # Evidence
-    upload_evidence: List[UploadEvidence] = Field(default_factory=list)
+    upload_evidence: list[UploadEvidence] = Field(default_factory=list)
 
 class LocalQuoteReviewService:
     """Service for local-only quote review operations."""
 
     def __init__(
-        self, 
+        self,
         sync_client: LocalSyncClient | None = None,
         crypto_service: CryptoService | None = None,
         signing_service: LocalDeviceSigningService | None = None,
@@ -57,16 +59,16 @@ class LocalQuoteReviewService:
         settings = get_settings()
         self.client = sync_client or LocalSyncClient()
         self.crypto = crypto_service or get_crypto_service()
-        
+
         # Use existing signing key if available
         sign_key = settings.intake_local_signing_key.get_secret_value() if settings.intake_local_signing_key else None
         self.signer = signing_service or LocalDeviceSigningService(private_key_base64=sign_key)
         self.device_id = "dev-device-1" # In prod this would come from local identity storage
-        
+
         from intake.local_console.security.unlock import get_auth_window
         self.auth_window = auth_window or get_auth_window()
 
-    def get_pending_reviews(self) -> List[HostedQuoteProjection]:
+    def get_pending_reviews(self) -> list[HostedQuoteProjection]:
         """Get list of quotes pending review from hosted."""
         return self.client.fetch_pending_projections()
 
@@ -74,23 +76,23 @@ class LocalQuoteReviewService:
         """Fetch and decrypt a quote for local review."""
         # 1. Check lock status
         is_locked = not self.auth_window.is_unlocked
-        
+
         # 2. Fetch projection for metadata
         projections = self.client.fetch_pending_projections()
         projection = next((p for p in projections if p.quote_id == quote_id), None)
-        
+
         if not projection:
             raise ValueError(f"Quote {quote_id} not found in pending list")
 
         # 3. Fetch envelope for ciphertext
         envelope = self.client.fetch_quote_envelope(quote_id)
-        
+
         # 4. Decrypt fields (only if not locked)
         exact_location = None
         access_notes = None
         questionnaire = None
         evidence = []
-        
+
         if not is_locked:
             if envelope.encrypted_exact_location:
                 decrypted = self.crypto.decrypt_json(envelope.encrypted_exact_location)

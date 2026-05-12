@@ -2,14 +2,10 @@
 
 import argparse
 import sys
-from typing import Any
 
 # WARNING: This CLI is for DEVELOPMENT and DIAGNOSTIC purposes only.
 # It is NOT a product surface and should not be used by end-users.
 # The actual management surface is the Local Intake Console application.
-
-from intake.config import get_settings
-from intake.local_console.decrypt_utils import decrypt_quote_payload
 from intake.storage.repositories import QuoteRepository
 
 
@@ -115,7 +111,7 @@ def sync_review(args: argparse.Namespace) -> int:
         if args.quote_id:
             print(f"\nFetching and decrypting envelope for quote {args.quote_id}...")
             review = service.get_decrypted_review(args.quote_id)
-            
+
             print("\n=== Decrypted Local Review ===")
             print(f"  ID: {review.quote_id}")
             print(f"  Status: {review.status}")

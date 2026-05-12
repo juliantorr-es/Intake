@@ -17,29 +17,21 @@ Security:
 """
 
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from intake.costs import (
-    CostAssumption,
+    CostCalculator,
+    CostCalculatorError,
     CostConfidence,
-    CostCurrency,
-    CostEstimateLineItem,
-    CostEstimateScenario,
     CostFactSourceKind,
     CostFrequency,
     CostRiskLevel,
-    CostSourceSnapshot,
-    CostCalculator,
-    CostCalculatorError,
-    VendorCostReceipt,
-    VendorProvider,
     VendorProviderKind,
     get_cost_calculator,
 )
-from intake.domain.time import utc_now
 
 router = APIRouter(prefix="/costs")
 
@@ -109,12 +101,12 @@ class AddAssumptionRequest(BaseModel):
     description: str
     data_type: str = "integer"
     value: Any = None
-    unit: Optional[str] = None
+    unit: str | None = None
     confidence: str = "unknown"  # CostConfidence value
     risk_level: str = "unknown"  # CostRiskLevel value
     notes: str = ""
-    source: Optional[str] = None
-    source_url: Optional[str] = None
+    source: str | None = None
+    source_url: str | None = None
 
 
 class AssumptionResponse(BaseModel):
@@ -125,7 +117,7 @@ class AssumptionResponse(BaseModel):
     description: str
     data_type: str
     value: Any
-    unit: Optional[str]
+    unit: str | None
     confidence: str
     risk_level: str
     notes: str
@@ -135,8 +127,8 @@ class AddSnapshotRequest(BaseModel):
     """Request to add a source snapshot."""
     source_url: str
     source_kind: str = "vendor_website"  # CostFactSourceKind value
-    vendor_kind: Optional[str] = None  # VendorProviderKind value
-    source_title: Optional[str] = None
+    vendor_kind: str | None = None  # VendorProviderKind value
+    source_title: str | None = None
     notes: str = ""
 
 
@@ -144,22 +136,22 @@ class SnapshotResponse(BaseModel):
     """Response with created snapshot."""
     snapshot_id: str
     source_url: str
-    source_title: Optional[str]
+    source_title: str | None
     captured_at: str
     source_kind: str
-    vendor_kind: Optional[str]
+    vendor_kind: str | None
     notes: str
 
 
 class GenerateReceiptRequest(BaseModel):
     """Request to generate a receipt from a scenario."""
     scenario_id: str
-    display_name: Optional[str] = None
-    description: Optional[str] = None
+    display_name: str | None = None
+    description: str | None = None
     valid_until_days: int = 30
-    disclaimer: Optional[str] = None
-    client_id: Optional[str] = None
-    quote_id: Optional[str] = None
+    disclaimer: str | None = None
+    client_id: str | None = None
+    quote_id: str | None = None
 
 
 class GenerateReceiptResponse(BaseModel):
@@ -167,15 +159,15 @@ class GenerateReceiptResponse(BaseModel):
     receipt_id: str
     scenario_id: str
     display_name: str
-    total_monthly_usd: Optional[float]
-    total_one_time_usd: Optional[float]
-    total_usd: Optional[float]
+    total_monthly_usd: float | None
+    total_one_time_usd: float | None
+    total_usd: float | None
     currency: str
-    provider_costs_total_usd: Optional[float]
-    intake_costs_total_usd: Optional[float]
+    provider_costs_total_usd: float | None
+    intake_costs_total_usd: float | None
     provider_costs_breakdown: dict[str, float]
     valid_from: str
-    valid_until: Optional[str]
+    valid_until: str | None
     disclaimer: str
     created_at: str
 
@@ -185,9 +177,9 @@ class ScenarioDetailResponse(BaseModel):
     scenario_id: str
     display_name: str
     description: str
-    total_monthly_usd: Optional[float]
-    total_one_time_usd: Optional[float]
-    total_usd: Optional[float]
+    total_monthly_usd: float | None
+    total_one_time_usd: float | None
+    total_usd: float | None
     currency: str
     line_items: list[dict[str, Any]]
     assumptions: list[dict[str, Any]]
@@ -195,7 +187,7 @@ class ScenarioDetailResponse(BaseModel):
     overall_confidence: str
     overall_risk_level: str
     created_at: str
-    updated_at: Optional[str] = None
+    updated_at: str | None = None
 
 
 class ScenarioListResponse(BaseModel):
@@ -220,7 +212,7 @@ async def list_providers(calculator: CostCalculator = Depends(get_cost_calculato
     Does not include credentials or sensitive data.
     """
     providers = calculator.list_providers()
-    
+
     return ProviderListResponse(
         providers=[p.model_dump() for p in providers]
     )
@@ -237,10 +229,10 @@ async def create_scenario(
         description=request.description,
         created_by="local_console",
     )
-    
+
     scenario.tags = request.tags
     calculator.update_scenario(scenario)
-    
+
     return CreateScenarioResponse(
         scenario_id=scenario.scenario_id,
         display_name=scenario.display_name,
@@ -255,7 +247,7 @@ async def list_scenarios(
 ):
     """List all cost estimate scenarios."""
     scenarios = calculator.list_scenarios()
-    
+
     return ScenarioListResponse(
         scenarios=[s.get_safe_display() for s in scenarios]
     )
@@ -270,7 +262,7 @@ async def get_scenario(
     scenario = calculator.get_scenario(scenario_id)
     if not scenario:
         raise HTTPException(status_code=404, detail="Scenario not found")
-    
+
     return ScenarioDetailResponse(
         scenario_id=scenario.scenario_id,
         display_name=scenario.display_name,
@@ -317,7 +309,7 @@ async def add_line_item(
         raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return LineItemResponse(
         line_item_id=line_item.line_item_id,
         scenario_id=line_item.scenario_id,
@@ -361,7 +353,7 @@ async def add_assumption(
         raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return AssumptionResponse(
         assumption_id=assumption.assumption_id,
         scenario_id=assumption.scenario_id,
@@ -393,7 +385,7 @@ async def add_snapshot(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return SnapshotResponse(
         snapshot_id=snapshot.snapshot_id,
         source_url=snapshot.source_url,
@@ -426,7 +418,7 @@ async def generate_receipt(
         raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     return GenerateReceiptResponse(
         receipt_id=receipt.receipt_id,
         scenario_id=receipt.scenario_id,
@@ -451,7 +443,7 @@ async def list_receipts(
 ):
     """List all generated cost receipts."""
     receipts = calculator.list_receipts()
-    
+
     return ReceiptListResponse(
         receipts=[r.get_safe_display() for r in receipts]
     )
