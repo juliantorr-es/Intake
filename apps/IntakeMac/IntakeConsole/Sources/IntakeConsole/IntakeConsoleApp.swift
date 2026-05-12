@@ -6,16 +6,18 @@ struct IntakeConsoleApp: App {
     
     @StateObject private var healthClient: BackendHealthClient
     @StateObject private var launcher: BackendLauncher
+    @StateObject private var authState: LocalAuthorizationState
     
     init() {
         let url = URL(string: "http://127.0.0.1:8000")!
         _healthClient = StateObject(wrappedValue: BackendHealthClient(url: url))
         _launcher = StateObject(wrappedValue: BackendLauncher(mode: .managed))
+        _authState = StateObject(wrappedValue: LocalAuthorizationState())
     }
     
     var body: some Scene {
         WindowGroup {
-            ContentView(healthClient: healthClient, launcher: launcher, backendURL: backendURL)
+            ContentView(healthClient: healthClient, launcher: launcher, authState: authState, backendURL: backendURL)
                 .frame(minWidth: 800, minHeight: 600)
         }
         .windowStyle(.hiddenTitleBar)

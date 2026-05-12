@@ -23,6 +23,8 @@ async function initApp() {
     });
 
     document.getElementById('btn-sync').addEventListener('click', triggerSync);
+    document.getElementById('btn-request-unlock').addEventListener('click', requestSecureUnlock);
+    document.getElementById('btn-lock-now').addEventListener('click', lockSecureSession);
 
     // Initial load
     await updateStatus();
@@ -125,9 +127,26 @@ async function showQuoteDetail(quoteId) {
         document.getElementById('detail-area').textContent = detail.general_service_area || 'N/A';
         document.getElementById('detail-email-verified').classList.toggle('hidden', !detail.email_verified);
         
-        document.getElementById('detail-location').textContent = detail.exact_location || 'Not provided';
-        document.getElementById('detail-notes').textContent = detail.access_notes || 'No notes';
-        document.getElementById('detail-questionnaire').textContent = JSON.stringify(detail.questionnaire_answers, null, 2);
+        // Handle Lock State
+        const unlockOverlay = document.getElementById('unlock-required-overlay');
+        const unlockStatus = document.getElementById('unlock-status-container');
+        
+        if (detail.is_locked) {
+            unlockOverlay.classList.remove('hidden');
+            unlockStatus.classList.add('hidden');
+            document.getElementById('detail-location').textContent = '••••••••';
+            document.getElementById('detail-notes').textContent = '••••••••';
+            document.getElementById('detail-questionnaire').textContent = '{ "locked": true }';
+        } else {
+            unlockOverlay.classList.add('hidden');
+            unlockStatus.classList.remove('hidden');
+            document.getElementById('detail-location').textContent = detail.exact_location || 'Not provided';
+            document.getElementById('detail-notes').textContent = detail.access_notes || 'No notes';
+            document.getElementById('detail-questionnaire').textContent = JSON.stringify(detail.questionnaire_answers, null, 2);
+            
+            // Start timer if available
+            startUnlockTimer();
+        }
         
         // Render evidence
         document.getElementById('detail-upload-count').textContent = detail.upload_count;
@@ -259,4 +278,53 @@ async function triggerSync() {
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
+}
+
+async function requestSecureUnlock() {
+    console.log('JS: Requesting Secure Unlock...');
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.requestSecureUnlock) {
+        window.webkit.messageHandlers.requestSecureUnlock.postMessage(null);
+    } else {
+        // Fallback for browser testing
+        const response = await fetch('/api/local/security/unlock', { method: 'POST' });
+        if (response.ok) {
+            location.reload();
+        }
+    }
+}
+
+async function lockSecureSession() {
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.lockSecureSession) {
+        window.webkit.messageHandlers.lockSecureSession.postMessage(null);
+    } else {
+        await fetch('/api/local/security/lock', { method: 'POST' });
+        location.reload();
+    }
+}
+
+let unlockTimer = null;
+async function startUnlockTimer() {
+    if (unlockTimer) clearInterval(unlockTimer);
+    
+    const updateTimer = async () => {
+        try {
+            const response = await fetch('/api/local/security/status');
+            const status = await response.json();
+            
+            if (!status.is_unlocked) {
+                location.reload(); // Re-lock view
+                clearInterval(unlockTimer);
+                return;
+            }
+            
+            const minutes = Math.floor(status.seconds_remaining / 60);
+            const seconds = Math.floor(status.seconds_remaining % 60);
+            document.getElementById('unlock-time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        } catch (err) {
+            console.error('Failed to update unlock timer:', err);
+        }
+    };
+    
+    await updateTimer();
+    unlockTimer = setInterval(updateTimer, 1000);
 }

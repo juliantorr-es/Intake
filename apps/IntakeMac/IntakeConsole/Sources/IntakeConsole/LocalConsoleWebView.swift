@@ -4,11 +4,15 @@ import WebKit
 struct LocalConsoleWebView: NSViewRepresentable {
     let url: URL
     let reloadTrigger: Int
+    let authAction: () -> Void
+    let lockAction: () -> Void
     
     func makeNSView(context: Context) -> WKWebView {
         let userScript = WKUserScript(source: "document.body.classList.add('native-shell');", injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         let contentController = WKUserContentController()
         contentController.addUserScript(userScript)
+        contentController.add(context.coordinator, name: "requestSecureUnlock")
+        contentController.add(context.coordinator, name: "lockSecureSession")
         
         let configuration = WKWebViewConfiguration()
         configuration.userContentController = contentController
@@ -36,12 +40,20 @@ struct LocalConsoleWebView: NSViewRepresentable {
         Coordinator(self)
     }
     
-    class Coordinator: NSObject, WKNavigationDelegate {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: LocalConsoleWebView
         var lastReloadTrigger: Int = 0
         
         init(_ parent: LocalConsoleWebView) {
             self.parent = parent
+        }
+        
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "requestSecureUnlock" {
+                parent.authAction()
+            } else if message.name == "lockSecureSession" {
+                parent.lockAction()
+            }
         }
         
         func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {

@@ -27,6 +27,7 @@ enum NavSection: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @StateObject var healthClient: BackendHealthClient
     @StateObject var launcher: BackendLauncher
+    @ObservedObject var authState: LocalAuthorizationState
     @State private var selectedSection: NavSection? = .quotes
     @State private var reloadTrigger = 0
     @State private var showInspector = true
@@ -49,8 +50,13 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
                     if healthClient.status == .online {
-                        LocalConsoleWebView(url: backendURL, reloadTrigger: reloadTrigger)
-                            .background(IntakeTheme.Colors.paper)
+                        LocalConsoleWebView(
+                            url: backendURL,
+                            reloadTrigger: reloadTrigger,
+                            authAction: performSecureUnlock,
+                            lockAction: performSecureLock
+                        )
+                        .background(IntakeTheme.Colors.paper)
                     } else {
                         BackendOfflineView(healthClient: healthClient, launcher: launcher)
                     }
@@ -100,6 +106,58 @@ struct ContentView: View {
         .onDisappear {
             healthClient.stopMonitoring()
         }
+    }
+    
+    private func performSecureUnlock() {
+        Task {
+            let result = await SecureUnlockService.shared.requestUnlock(reason: "Authorize sensitive data decryption")
+            
+            await MainActor.run {
+                switch result {
+                case .success:
+                    authState.unlock()
+                    // Tell the backend we are unlocked
+                    notifyBackendOfUnlock()
+                    // Refresh the web view
+                    reloadTrigger += 1
+                case .failed(let reason):
+                    authState.setFailed(reason: reason)
+                case .cancelled:
+                    print("Unlock cancelled by user")
+                case .unavailable:
+                    authState.setFailed(reason: "Secure Unlock unavailable")
+                }
+            }
+        }
+    }
+    
+    private func notifyBackendOfUnlock() {
+        let unlockURL = backendURL.appendingPathComponent("api/local/security/unlock")
+        var request = URLRequest(url: unlockURL)
+        request.httpMethod = "POST"
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Failed to notify backend of unlock: \(error)")
+            } else {
+                print("Backend notified of unlock success")
+            }
+        }.resume()
+    }
+    
+    private func performSecureLock() {
+        authState.lock()
+        
+        let lockURL = backendURL.appendingPathComponent("api/local/security/lock")
+        var request = URLRequest(url: lockURL)
+        request.httpMethod = "POST"
+        
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            print("Backend notified of lock")
+            DispatchQueue.main.async {
+                reloadTrigger += 1
+            }
+        }.resume()
     }
 }
 

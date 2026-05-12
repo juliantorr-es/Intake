@@ -349,13 +349,3 @@ async def start_quote_review(
 async def trigger_sync_pull():
     """Manually trigger a sync pull (placeholder for now)."""
     return {"status": "success", "message": "Sync pull triggered"}
-@router.get("/deploy/status")
-async def get_deploy_status():
-    """Get status of host bootstrapping and deployment."""
-    providers = list_supported_providers()
-    return {
-        "status": "not_configured",
-        "supported_providers": [p.value for p in providers],
-        "last_deployment": None,
-        "recommended_first_step": "scaffold_railway"
-    }

@@ -49,11 +49,14 @@ class Settings(BaseSettings):
     intake_local_sync_token: SecretStr | None = Field(
         default=None
     )
-    # Private signing key for the local device (Base64 Ed25519)
     intake_local_signing_key: SecretStr | None = Field(
         default=None
     )
     intake_enable_dev_sync_auth: bool = Field(default=True)
+
+    # Local Secure Unlock
+    intake_require_local_unlock_for_decrypt: bool = Field(default=True)
+    intake_local_unlock_ttl_seconds: int = Field(default=120)
 
     # Session cookie configuration
     intake_session_cookie_name: str = Field(default="intake_session")
