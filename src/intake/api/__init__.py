@@ -5,6 +5,7 @@ from intake.api.auth_passkeys import router as auth_router
 from intake.api.quotes import router as quotes_router
 from intake.api.account import router as account_router
 from intake.hosted.api.sync import router as sync_router
+from intake.hosted.api.upload_broker import router as upload_broker_router
 
 # Combine all routers
 from fastapi import APIRouter
@@ -15,3 +16,4 @@ api_router.include_router(auth_router, prefix="/auth")
 api_router.include_router(quotes_router, prefix="/quotes")
 api_router.include_router(account_router, prefix="/account")
 api_router.include_router(sync_router, prefix="/sync")
+api_router.include_router(upload_broker_router, prefix="/quotes")

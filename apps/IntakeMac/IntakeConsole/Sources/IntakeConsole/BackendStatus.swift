@@ -12,7 +12,7 @@ enum BackendStatus: String {
     
     var colorName: String {
         switch self {
-        case .starting: return "orange"
+        case .starting: return "amber"
         case .online: return "green"
         case .offline: return "gray"
         case .failed: return "red"

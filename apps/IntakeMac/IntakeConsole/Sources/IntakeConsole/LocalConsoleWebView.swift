@@ -6,7 +6,13 @@ struct LocalConsoleWebView: NSViewRepresentable {
     let reloadTrigger: Int
     
     func makeNSView(context: Context) -> WKWebView {
+        let userScript = WKUserScript(source: "document.body.classList.add('native-shell');", injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        let contentController = WKUserContentController()
+        contentController.addUserScript(userScript)
+        
         let configuration = WKWebViewConfiguration()
+        configuration.userContentController = contentController
+        
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         

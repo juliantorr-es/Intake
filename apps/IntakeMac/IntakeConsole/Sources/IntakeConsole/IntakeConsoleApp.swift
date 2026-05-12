@@ -19,5 +19,6 @@ struct IntakeConsoleApp: App {
                 .frame(minWidth: 800, minHeight: 600)
         }
         .windowStyle(.hiddenTitleBar)
+        .windowToolbarStyle(.unified)
     }
 }
