@@ -5,7 +5,7 @@ from typing import Any
 from datetime import datetime, timezone
 
 from intake.config import get_settings
-from intake.sync.models import LocalDeviceActionEnvelope
+from intake.sync.models import LocalDeviceActionEnvelope, HostedQuoteProjection, EncryptedQuoteEnvelope
 from intake.services.signing_service import HostedActionVerificationService
 from intake.storage.repositories import SyncRepository, QuoteRepository, EventRepository
 from intake.domain.quotes import QuoteStatus
@@ -21,11 +21,32 @@ async def verify_sync_token(x_intake_sync_token: str = Header(None)):
     settings = get_settings()
     if not settings.intake_enable_dev_sync_auth:
         return
-    if not x_intake_sync_token or x_intake_sync_token != settings.intake_local_sync_token.get_secret_value():
+    if not x_intake_sync_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing sync token"
+        )
+    if x_intake_sync_token != settings.intake_local_sync_token.get_secret_value():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid sync token"
         )
+
+@router.get("/quotes/pending", dependencies=[Depends(verify_sync_token)], response_model=list[HostedQuoteProjection])
+async def get_pending_quotes(quote_repo: QuoteRepository = Depends(lambda: QuoteRepository())):
+    """Get non-sensitive projections of quotes needing review."""
+    quotes = quote_repo.get_all_quotes()
+    # Filter for those needing review
+    pending = [q for q in quotes if q.status in [QuoteStatus.SUBMITTED, QuoteStatus.NEEDS_REVIEW]]
+    return [HostedQuoteProjection.from_domain(q) for q in pending]
+
+@router.get("/quotes/{quote_id}/envelope", dependencies=[Depends(verify_sync_token)], response_model=EncryptedQuoteEnvelope)
+async def get_quote_envelope(quote_id: str, quote_repo: QuoteRepository = Depends(lambda: QuoteRepository())):
+    """Get the encrypted envelope for a specific quote."""
+    quote = quote_repo.get_by_id(quote_id)
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quote not found")
+    return EncryptedQuoteEnvelope.from_domain(quote)
 
 @router.post("/actions", dependencies=[Depends(verify_sync_token)])
 async def process_local_action(

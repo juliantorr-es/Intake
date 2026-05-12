@@ -528,6 +528,18 @@ class QuoteRepository:
                 results.append(domain)
             return results
 
+    def get_all_quotes(self) -> list[Quote]:
+        """Get all quotes (domain models)."""
+        with self._get_session() as session:
+            statement = select(QuoteModel)
+            models = session.exec(statement).all()
+            results = []
+            for m in models:
+                domain = m.to_domain()
+                domain.uploads = self._load_uploads(session, m)
+                results.append(domain)
+            return results
+
     def create(self, quote: Quote) -> Quote:
         """Create a new quote."""
         with self._get_session() as session:

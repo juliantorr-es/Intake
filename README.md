@@ -89,6 +89,10 @@ Intake/
 │   │   ├── auth/           # Passkey and account logic
 │   │   ├── quotes/         # Quote intake logic
 │   │   └── uploads/        # Binary upload logic
+│   ├── deploy/             # Host Bootstrapping & Deployment module
+│   │   ├── adapters/       # Provider-specific adapters (Railway, etc.)
+│   │   ├── models.py       # Deployment domain models
+│   │   └── registry.py     # Provider registry
 │   ├── local_console/      # Local Management Console module
 │   ├── sync/               # Sync protocol models
 │   ├── domain/             # Pure domain models (Pure Python)
@@ -338,6 +342,13 @@ Intake enforces a strict data boundary:
 
 See [Hosted/Local Boundary](docs/architecture/hosted-local-boundary.md) for full architecture details.
 
+## Host Bootstrapping
+
+Intake includes a **Deployment Adapter Architecture** to help operators provision and configure Hosted Intake instances.
+- **Provider Adapters**: Currently supports **Railway** artifact generation.
+- **Security First**: Local private keys are NEVER included in deployment artifacts.
+- **Artifact Generation**: Generates `railway.json` and `.env.hosted.example` for manual or CLI-based deployment.
+
 ## Next Recommended Slice
 
-**Local Console Writeback Actions**: Allow operators to transition quote statuses (e.g., to `reviewing` or `quoted`) directly from the Local Console, with actions being signed and pushed back to the Hosted backend.
+**Railway Dry-Run Bootstrap**: Enhance the Local Console to verify the `railway` CLI environment, check authentication status, and produce an executable deployment plan with real configuration placeholders.
