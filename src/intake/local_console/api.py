@@ -235,6 +235,45 @@ async def get_receiver_status():
     raise HTTPException(status_code=503, detail="Receiver service not configured")
 
 
+@router.get("/tunnel/status")
+async def get_tunnel_status():
+    """Get tunnel adapter dry-run status for all providers.
+    
+    Returns dry-run plans only. No tunnel commands are executed or activated.
+    """
+    try:
+        from intake.deploy.tunnel_adapters import get_tunnel_adapter_service
+        tunnel_svc = get_tunnel_adapter_service()
+        return tunnel_svc.get_all_plans()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tunnel/{provider}/dry-run")
+async def get_tunnel_dry_run_plan(provider: str):
+    """Get dry-run plan for a specific tunnel provider.
+    
+    Generates TEXT-ONLY commands that would be run.
+    NO commands are executed or activated.
+    """
+    try:
+        from intake.deploy.tunnel_adapters.models import TunnelProviderKind
+        from intake.deploy.tunnel_adapters import get_tunnel_adapter_service
+        
+        tunnel_svc = get_tunnel_adapter_service()
+        
+        # Validate provider
+        try:
+            provider_enum = TunnelProviderKind(provider)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Unknown tunnel provider: {provider}")
+        
+        plan = tunnel_svc.generate_dry_run_plan(provider_enum, receiver_port=8001)
+        return plan
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/deploy/railway/dry-run", response_model=RailwayDryRunPlanResponse)
 async def get_railway_dry_run_plan():
     """Generate and return a Railway dry-run plan.

@@ -77,11 +77,11 @@ class TunnelCLIStatus(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "examples": [{
             "provider": "tailscale_funnel",
-            "cliavailable": true,
+            "cli_available": True,
             "cli_path": "/usr/local/bin/tailscale",
             "version": "1.68.0",
             "min_version": "1.0.0",
-            "satisfies_minimum": true,
+            "satisfies_minimum": True,
         }]
     })
     
@@ -107,11 +107,11 @@ class TunnelExposurePolicy(BaseModel):
     """
     model_config = ConfigDict(json_schema_extra={
         "examples": [{
-            "enabled": false,
-            "loopback_only_default": true,
-            "explicit_approval_required": true,
-            "expose_receiver_api": true,
-            "expose_console_api": false,
+            "enabled": False,
+            "loopback_only_default": True,
+            "explicit_approval_required": True,
+            "expose_receiver_api": True,
+            "expose_console_api": False,
             "allowed_paths": ["/receiver/*"],
             "blocked_paths": ["/", "/console/*", "/decrypt/*", "/review/*"],
         }]
@@ -155,8 +155,8 @@ class TunnelCommandPlan(BaseModel):
             "command": "tailscale funnel 127.0.0.1:8001",
             "description": "Expose local receiver via Tailscale Funnel",
             "safety": "needs_approval",
-            "would_execute": false,
-            "executable thir held in this model": true,
+            "would_execute": False,
+            "creates_public_endpoint": True,
         }]
     })
     
@@ -179,11 +179,11 @@ class TunnelDryRunPlan(BaseModel):
             "plan_id": "tailscale_funnel_dry_run_001",
             "provider": "tailscale_funnel",
             "readiness": "ready_for_dry_run",
-            "activated": false,
+            "activated": False,
             "commands_that_would_run": [
-                {"command": "tailscale funnel 127.0.0.1:8001", "would_execute": false}
+                {"command": "tailscale funnel 127.0.0.1:8001", "would_execute": False}
             ],
-            "exposure_policy": {"enabled": false, "explicit_approval_required": true},
+            "exposure_policy": {"enabled": False, "explicit_approval_required": True},
         }]
     })
     
@@ -220,10 +220,10 @@ class TunnelAdapterConfig(BaseModel):
     model_config = ConfigDict(json_schema_extra={
         "examples": [{
             "provider": "tailscale_funnel",
-            "enabled": false,
+            "enabled": False,
             "receiver_port": 8001,
             "public_port": 443,
-            "explicit_approval_required": true,
+            "explicit_approval_required": True,
         }]
     })
     
@@ -243,10 +243,10 @@ class TunnelAdapterPlanSummary(BaseModel):
     """Summary of tunnel adapter plans across all providers."""
     model_config = ConfigDict(json_schema_extra={
         "examples": [{
-            "tailscale": {"readiness": "ready_for_dry_run", "activated": false},
-            "cloudflare": {"readiness": "not_installed", "activated": false},
-            "any_activated": false,
-            "all_disabled": true,
+            "tailscale": {"readiness": "ready_for_dry_run", "activated": False},
+            "cloudflare": {"readiness": "not_installed", "activated": False},
+            "any_activated": False,
+            "all_disabled": True,
         }]
     })
     

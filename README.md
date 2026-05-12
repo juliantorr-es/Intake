@@ -92,6 +92,12 @@ Intake/
 │   │   └── uploads/        # Binary upload logic
 │   ├── deploy/             # Host Bootstrapping & Deployment module
 │   │   ├── adapters/       # Provider-specific adapters (Railway, etc.)
+│   │   ├── tunnel_adapters/# Tunnel dry-run adapters (Tailscale, Cloudflare)
+│   │   │   ├── models.py   # Tunnel adapter models
+│   │   │   ├── service.py  # Tunnel adapter service
+│   │   │   ├── tailscale_funnel.py  # Tailscale adapter
+│   │   │   ├── cloudflare_tunnel.py # Cloudflare adapter
+│   │   │   └── __init__.py
 │   │   ├── models.py       # Deployment domain models
 │   │   └── registry.py     # Provider registry
 │   ├── local_console/      # Local Management Console module
@@ -125,7 +131,11 @@ Intake/
 │   ├── test_crypto_service.py
 │   ├── test_quote_models.py
 │   ├── test_event_log.py
-│   └── test_passkey_shapes.py
+│   ├── test_passkey_shapes.py
+│   ├── test_local_receiver.py      # Local Upload Receiver tests
+│   ├── test_tunnel_adapters.py      # Tunnel adapter tests
+│   ├── test_provider_routing.py     # Provider routing tests
+│   └── test_railway_dry_run.py       # Railway dry-run tests
 ├── scripts/
 │   ├── dev.sh              # Start dev server
 │   └── check.sh            # Run linting and tests
@@ -525,10 +535,21 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
   - Route decision integration
   - Local Console status integration
 
+- ✅ **Tunnel Adapter Dry-Run Scaffolding** - Dry-run only tunnel integration:
+  - Tailscale Funnel adapter with read-only CLI detection
+  - Cloudflare Tunnel adapter with read-only CLI detection
+  - Text-only command generation (NEVER executed)
+  - Exposure policy (loopback-only, console-never-exposed)
+  - API endpoints: `/tunnel/status`, `/tunnel/{provider}/dry-run`
+
 - ✅ **Documentation**:
   - [Local Receiver Uploads](docs/architecture/local_receiver_uploads.md)
+  - [Tunnel Adapter Dry-Run Scaffolding](docs/architecture/tunnel_adapters.md)
+  - Boundary proof: [Tunnel Adapter Boundary](docs/proofs/tunnel_adapter_boundary.md)
 
-- ✅ **Tests**: `tests/test_local_receiver.py` - 16+ passing tests
+- ✅ **Tests**:
+  - `tests/test_local_receiver.py` - 18 passing tests
+  - `tests/test_tunnel_adapters.py` - 40 passing tests
 
 ## What This Slice Intentionally Does NOT Do
 
@@ -539,24 +560,24 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
 - ❌ Does NOT create provider projects
 - ❌ Does NOT store provider tokens
 - ❌ Does NOT add real Google Drive OAuth
-- ❌ Does NOT add real Tailscale/Cloudflare commands
+- ❌ Does NOT execute real Tailscale/Cloudflare tunnel commands
 - ❌ Does NOT add payments
 - ❌ Does NOT add calendar integration
 - ❌ Does NOT add SMS
 - ❌ Does NOT add object storage implementation
 - ❌ Does NOT add inbound control channels
-- ❌ Does NOT expose public URLs for receiver
+- ❌ Does NOT expose public URLs for receiver (tunnel commands are text-only)
 - ❌ Does NOT implement resumable uploads (tus)
 
 ## Next Recommended Slice
 
-**Tunnel Adapter Layer**: Add support for exposing the Local Receiver publicly via tunnels.
+**Tunnel Activation Layer**: Disable dry-run mode and enable real tunnel activation.
 
 This will:
-- Add Tailscale Funnel adapter for HTTPS exposure
-- Add Cloudflare Tunnel adapter for HTTPS exposure
-- Keep receiver loopback-only by default
-- Add configuration for tunnel selection
-- Maintain boundary between public exposure and local-only mode
+- Add explicit approval mechanism for tunnel activation
+- Enable actual execution of tunnel commands (behind approval gate)
+- Add TLS certificate management for exposed endpoints
+- Add domain configuration for public URLs
+- Maintain all existing safety boundaries
 
-**Why this is next**: The Local Receiver is now operational for local-loopback uploads. The next step is to enable public exposure via tunnel adapters so clients can upload directly to your local instance from anywhere.
+**Why this is next**: Tunnel adapter dry-run scaffolding is now complete with CLI detection and text-only command generation. The next step is to add the approval mechanism and real activation while maintaining all safety boundaries.

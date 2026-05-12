@@ -221,6 +221,16 @@ class TunnelAdapterService:
                 commands_that_would_run=[],
                 exposure_policy=TunnelExposurePolicy(),
                 blocking_issues=[f"{provider.value} CLI not installed"],
+                warnings=[
+                    "Commands are TEXT ONLY - NEVER EXECUTED in dry-run mode",
+                    "CLI must be installed before dry-run planning",
+                    "Receiver will remain loopback-only until tunnel is configured",
+                ],
+                next_steps=[
+                    "Install the CLI tool",
+                    "Review generated commands once CLI is available",
+                    "Grant explicit approval if ready to activate",
+                ],
             )
         
         # Generate commands (TEXT ONLY - NEVER EXECUTED)
