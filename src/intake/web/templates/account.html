@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/widgets.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="header-title">Intake</a>
+            <nav class="header-nav">
+                <a href="/">Home</a>
+                <a href="/quote">Request Quote</a>
+                <a href="/account">Account</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <h1>Account Settings</h1>
+            <div class="gap-md">
+                <div class="card">
+                    <h2 class="card-title">Passkey Authentication</h2>
+                    <div class="card-body">
+                        <p class="text-muted mb-md">
+                            Sign in or register using passkeys (passwordless authentication).
+                        </p>
+                        <div id="passkey-auth-container"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="card-title">Session Status</h2>
+                    <div class="card-body">
+                        <div id="session-status">Checking session...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            &copy; {{ year if year else 2025 }} Intake. All rights reserved.
+        </div>
+    </footer>
+
+    <script type="module">
+        import { 
+            isPasskeySupported, 
+            createPasskeyLoginUI, 
+            createPasskeyRegistrationUI,
+            getSession,
+            logout 
+        } from '/static/js/passkeys.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            const authContainer = document.getElementById('passkey-auth-container');
+            const sessionStatus = document.getElementById('session-status');
+            
+            // Check session
+            try {
+                const session = await getSession();
+                if (session.authenticated) {
+                    sessionStatus.textContent = `Signed in as: ${session.account_id}`;
+                    
+                    // Show logout button
+                    const logoutBtn = document.createElement('button');
+                    logoutBtn.className = 'btn btn-secondary mt-md';
+                    logoutBtn.textContent = 'Sign Out';
+                    logoutBtn.addEventListener('click', async () => {
+                        await logout();
+                        location.reload();
+                    });
+                    sessionStatus.appendChild(document.createElement('br'));
+                    sessionStatus.appendChild(logoutBtn);
+                } else {
+                    sessionStatus.textContent = 'Not signed in';
+                    
+                    // Show auth options
+                    if (authContainer) {
+                        if (isPasskeySupported()) {
+                            const loginUI = createPasskeyLoginUI({
+                                title: 'Sign In',
+                                description: 'Sign in with your existing passkey.',
+                                onSuccess: (result) => {
+                                    sessionStatus.textContent = `Signed in as: ${result.account_id}`;
+                                    location.reload();
+                                }
+                            });
+                            authContainer.appendChild(loginUI);
+                            
+                            // Add separator
+                            const separator = document.createElement('div');
+                            separator.style.margin = '20px 0';
+                            separator.style.borderTop = '1px solid var(--color-border)';
+                            authContainer.appendChild(separator);
+                            
+                            // Add registration option
+                            const registerTitle = document.createElement('h3');
+                            registerTitle.style.marginTop = '0';
+                            registerTitle.textContent = 'New to Intake?';
+                            authContainer.appendChild(registerTitle);
+                            
+                            const registerUI = createPasskeyRegistrationUI({
+                                title: 'Create Account',
+                                description: 'Create a new account with a passkey.',
+                                onSuccess: (result) => {
+                                    sessionStatus.textContent = `Account created! ID: ${result.account_id}`;
+                                    location.reload();
+                                }
+                            });
+                            authContainer.appendChild(registerUI);
+                        } else {
+                            authContainer.textContent = 'Passkey authentication is not supported in your browser.';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Session check failed:', error);
+                sessionStatus.textContent = 'Error checking session';
+            }
+        });
+    </script>
+</body>
+</html>

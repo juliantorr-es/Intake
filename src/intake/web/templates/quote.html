@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/widgets.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="header-title">Intake</a>
+            <nav class="header-nav">
+                <a href="/">Home</a>
+                <a href="/quote">Request Quote</a>
+                <a href="/account">Account</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <h1>Request a Quote</h1>
+            <div id="intake-form-container"></div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            &copy; {{ year if year else 2025 }} Intake. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- Load intake form script as module -->
+    <script type="module">
+        import { startIntakeForm } from '/static/js/intake-form.js';
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('intake-form-container');
+            if (container) {
+                const form = startIntakeForm({
+                    onComplete: (state) => {
+                        console.log('Intake complete:', state);
+                    }
+                });
+                container.appendChild(form);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/static/css/tokens.css">
+    <link rel="stylesheet" href="/static/css/layout.css">
+    <link rel="stylesheet" href="/static/css/widgets.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="header-title">Intake</a>
+            <nav class="header-nav">
+                <a href="/">Home</a>
+                <a href="/quote">Request Quote</a>
+                <a href="/account">Account</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <div class="card">
+                <h1 class="card-title">Welcome to Intake</h1>
+                <div class="card-body gap-md">
+                    <p>
+                        Intake is a passkey-gated, locally decryptable client intake platform
+                        for freelance services.
+                    </p>
+                    <p>
+                        We offer services in:
+                    </p>
+                    <ul>
+                        <li><strong>Software Systems</strong> - Custom software development</li>
+                        <li><strong>Photography</strong> - Professional photography services</li>
+                        <li><strong>Practical Help</strong> - Hands-on assistance</li>
+                        <li><strong>Not Sure?</strong> - We can help figure out what you need</li>
+                    </ul>
+                    <div class="gap-md mt-md">
+                        <a href="/quote" class="btn btn-primary">Request a Quote</a>
+                        <a href="/account" class="btn btn-secondary">Account Settings</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            &copy; {{ year if year else 2025 }} Intake. All rights reserved.
+        </div>
+    </footer>
+</body>
+</html>

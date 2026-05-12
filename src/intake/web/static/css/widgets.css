@@ -1,0 +1,266 @@
+/* Widget-specific styles */
+
+/* Service lane selector */
+.service-lane-selector {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.service-lane-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background-color: transparent;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.service-lane-btn:hover {
+    border-color: var(--color-primary);
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.service-lane-btn.selected {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.service-lane-btn.selected:hover {
+    background-color: var(--color-primary-dark);
+}
+
+/* Upload list */
+.upload-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.upload-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-xs);
+}
+
+.upload-item-icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+}
+
+.upload-item-info {
+    flex: 1;
+}
+
+.upload-item-name {
+    font-weight: 500;
+    font-size: var(--font-size-sm);
+}
+
+.upload-item-meta {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+/* Status badge */
+.status-badge {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    border-radius: 9999px;
+}
+
+.status-badge-draft {
+    background-color: #f1f5f9;
+    color: #64748b;
+}
+
+.status-badge-submitted {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.status-badge-needs_review {
+    background-color: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge-reviewing {
+    background-color: #bfdbfe;
+    color: #1e40af;
+}
+
+.status-badge-quoted {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge-accepted {
+    background-color: #10b981;
+    color: white;
+}
+
+.status-badge-declined {
+    background-color: #ef4444;
+    color: white;
+}
+
+.status-badge-closed {
+    background-color: #94a3b8;
+    color: white;
+}
+
+/* Progress steps */
+.progress-steps {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+.progress-step {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.progress-step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    border: 2px solid var(--color-border);
+    background-color: var(--color-surface);
+    color: var(--color-text-muted);
+}
+
+.progress-step-circle.active {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.progress-step-circle.completed {
+    border-color: var(--color-success);
+    background-color: var(--color-success);
+    color: white;
+}
+
+.progress-step-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-muted);
+}
+
+.progress-step-label.active {
+    color: var(--color-primary);
+    font-weight: 600;
+}
+
+.progress-step-line {
+    width: 40px;
+    height: 2px;
+    background-color: var(--color-border);
+}
+
+.progress-step-line.active {
+    background-color: var(--color-primary);
+}
+
+/* Passkey authentication UI */
+.passkey-auth {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+.passkey-auth-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    margin-bottom: var(--spacing-md);
+}
+
+.passkey-auth-description {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+.passkey-auth-btn {
+    width: 100%;
+    padding: var(--spacing-md);
+    font-size: var(--font-size-base);
+}
+
+.passkey-auth-status {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+}
+
+.passkey-auth-status-info {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.passkey-auth-status-success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.passkey-auth-status-error {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+/* Loading spinner */
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        gap: var(--spacing-md);
+    }
+    
+    .header-nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .progress-steps {
+        flex-direction: column;
+        gap: var(--spacing-sm);
+    }
+    
+    .progress-step-line {
+        width: 2px;
+        height: 20px;
+    }
+}
