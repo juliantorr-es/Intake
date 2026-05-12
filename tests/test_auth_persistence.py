@@ -553,3 +553,73 @@ def test_session_cookie_custom():
     assert settings.intake_session_cookie_httponly is True
     assert settings.intake_session_cookie_samesite == "strict"
     assert settings.intake_session_ttl_seconds == 3600
+
+
+# ========== API Response Shape Tests ==========
+
+
+def test_registration_options_response_shape():
+    """Test that registration options response has required browser-consumable fields."""
+    from fastapi.testclient import TestClient
+    from intake.app import app
+    
+    client = TestClient(app)
+    response = client.post("/api/auth/passkey/register/options")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "options" in data
+    
+    options = data["options"]
+    # Browser needs these fields
+    assert "challenge" in options
+    assert "rp" in options
+    assert "user" in options
+    assert "pubKeyCredParams" in options or "pubKeyCredParams" in options  # Either format
+
+
+def test_login_options_response_shape():
+    """Test that login options response has required browser-consumable fields."""
+    from fastapi.testclient import TestClient
+    from intake.app import app
+    
+    client = TestClient(app)
+    response = client.post("/api/auth/passkey/login/options")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "options" in data
+    
+    options = data["options"]
+    # Browser needs these fields
+    assert "challenge" in options
+    assert "rpId" in options or "rp" in options  # webauthn v2 uses rpId
+
+
+def test_session_endpoint_no_token_leak():
+    """Test that GET /auth/session does not leak token material."""
+    from fastapi.testclient import TestClient
+    from intake.app import app
+    
+    client = TestClient(app)
+    response = client.get("/api/auth/passkey/session")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "authenticated" in data
+    # Should not contain raw token
+    assert "token" not in data or data.get("token") is None
+    assert "raw_token" not in data
+
+
+def test_logout_endpoint():
+    """Test that POST /auth/logout returns success."""
+    from fastapi.testclient import TestClient
+    from intake.app import app
+    
+    client = TestClient(app)
+    response = client.post("/api/auth/passkey/logout")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True

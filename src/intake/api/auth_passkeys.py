@@ -14,7 +14,7 @@ router = APIRouter(prefix="/passkey")
 class PasskeyRegisterOptionsRequest(BaseModel):
     """Request for registration options."""
 
-    pass
+    model_config = {"extra": "forbid"}
 
 
 class PasskeyRegisterOptionsResponse(BaseModel):
@@ -39,7 +39,7 @@ class PasskeyRegisterVerifyResponse(BaseModel):
 class PasskeyLoginOptionsRequest(BaseModel):
     """Request for login options."""
 
-    pass
+    model_config = {"extra": "forbid"}
 
 
 class PasskeyLoginOptionsResponse(BaseModel):
@@ -76,7 +76,7 @@ class LogoutResponse(BaseModel):
 
 @router.post("/register/options", response_model=PasskeyRegisterOptionsResponse)
 async def register_options(
-    request: PasskeyRegisterOptionsRequest,
+    request: PasskeyRegisterOptionsRequest | None = None,
     service: PasskeyService = Depends(get_passkey_service),
 ) -> PasskeyRegisterOptionsResponse:
     """Get options for passkey registration.
@@ -112,7 +112,7 @@ async def register_verify(
 
 @router.post("/login/options", response_model=PasskeyLoginOptionsResponse)
 async def login_options(
-    request: PasskeyLoginOptionsRequest,
+    request: PasskeyLoginOptionsRequest | None = None,
     service: PasskeyService = Depends(get_passkey_service),
 ) -> PasskeyLoginOptionsResponse:
     """Get options for passkey login.

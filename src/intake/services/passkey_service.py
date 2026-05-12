@@ -63,6 +63,55 @@ from intake.storage.models import PasskeyChallengeModel, PasskeyCredentialModel
 PASSKEY_SESSION_EXPIRY_SECONDS = 300  # 5 minutes
 
 
+def _normalize_credential_data(credential_data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize credential data from frontend camelCase to backend snake_case.
+    
+    The frontend sends credential data in browser format (camelCase):
+    - rawId -> raw_id
+    - authenticatorData -> authenticator_data (for auth response)
+    - etc.
+    
+    The webauthn library expects snake_case for some fields.
+    """
+    if not credential_data:
+        return credential_data
+    
+    # Create a copy to avoid mutating the original
+    result = dict(credential_data)
+    
+    # Convert rawId -> raw_id (both may be present from browser)
+    if 'rawId' in result and 'raw_id' not in result:
+        result['raw_id'] = result.pop('rawId')
+    
+    # Handle response field conversions
+    if 'response' in result:
+        response = dict(result['response'])
+        
+        # clientDataJSON stays as-is (webauthn handles it)
+        # attestationObject stays as-is
+        
+        # For authentication responses: authenticatorData, signature, userHandle
+        if 'authenticatorData' in response and 'authenticator_data' not in response:
+            response['authenticator_data'] = response.pop('authenticatorData')
+        if 'signature' in response and 'signature' not in response:
+            # signature stays as-is
+            pass
+        if 'userHandle' in response and 'user_handle' not in response:
+            response['user_handle'] = response.pop('userHandle')
+        
+        # For registration responses: getAuthenticatorData
+        if 'getAuthenticatorData' in response:
+            # This is a function in the browser, not data
+            del response['getAuthenticatorData']
+            # authenticatorData should be in the response from the browser
+        if 'authenticatorData' in response and 'authenticator_data' not in response:
+            response['authenticator_data'] = response.pop('authenticatorData')
+        
+        result['response'] = response
+    
+    return result
+
+
 class PasskeyService:
     """Service for passkey registration and authentication.
 
@@ -148,7 +197,7 @@ class PasskeyService:
             user_display_name="New User" if not account else f"User {account.id[:8]}",
             supported_pub_key_algs=supported_algs,
             authenticator_selection=AuthenticatorSelectionCriteria(
-                resident_key=AuthenticatorSelectionCriteria.ResidentKeyRequirement.REQUIRED,
+                resident_key=ResidentKeyRequirement.REQUIRED,
                 user_verification=UserVerificationRequirement.PREFERRED,
             ),
             attestation=AttestationConveyancePreference.NONE,
@@ -200,6 +249,9 @@ class PasskeyService:
         Raises:
             HTTPException: If verification fails
         """
+        # Normalize credential data from frontend camelCase to backend snake_case
+        credential_data = _normalize_credential_data(credential_data)
+        
         settings = get_settings()
         rp_config = self.get_relying_party_config()
 
@@ -381,6 +433,9 @@ class PasskeyService:
             HTTPException: If authentication fails
         """
         import json
+        
+        # Normalize credential data from frontend camelCase to backend snake_case
+        credential_data = _normalize_credential_data(credential_data)
 
         settings = get_settings()
         rp_config = self.get_relying_party_config()

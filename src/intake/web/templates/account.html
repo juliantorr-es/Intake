@@ -40,6 +40,19 @@
                         <div id="session-status">Checking session...</div>
                     </div>
                 </div>
+
+                <div class="card" style="border-left: 4px solid var(--color-primary);">
+                    <h2 class="card-title">Local Dev Debug</h2>
+                    <div class="card-body">
+                        <div style="font-family: monospace; font-size: 0.85em; white-space: pre-wrap;">
+<div id="debug-info">RP ID: {{ rp_id }}</div>
+<div>Origin: {{ origin }}</div>
+<div>RP Name: {{ rp_name }}</div>
+<div>WebAuthn supported: <span id="webauthn-support">checking...</span></div>
+<div>Session cookie: <span id="session-cookie">checking...</span></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
@@ -56,12 +69,23 @@
             createPasskeyLoginUI, 
             createPasskeyRegistrationUI,
             getSession,
-            logout 
+            logout,
+            RP_CONFIG
         } from '/static/js/passkeys.js';
         
         document.addEventListener('DOMContentLoaded', async () => {
             const authContainer = document.getElementById('passkey-auth-container');
             const sessionStatus = document.getElementById('session-status');
+            
+            // Debug info
+            const webauthnSupportEl = document.getElementById('webauthn-support');
+            const sessionCookieEl = document.getElementById('session-cookie');
+            if (webauthnSupportEl) {
+                webauthnSupportEl.textContent = isPasskeySupported() ? 'Yes' : 'No (use Chrome/Safari/Edge/Firefox)';
+            }
+            if (sessionCookieEl) {
+                sessionCookieEl.textContent = document.cookie.includes('intake_session') ? 'Found' : 'Not found';
+            }
             
             // Check session
             try {

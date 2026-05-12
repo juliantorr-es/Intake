@@ -216,6 +216,82 @@ Override by explicitly setting `INTAKE_SESSION_COOKIE_SECURE=true/false`.
 - No IP-based session validation
 - RP ID must be a domain string (use `localhost` for dev)
 
+## Local Browser Passkey Testing
+
+### Prerequisites
+
+- Modern browser supporting WebAuthn (Chrome, Safari, Edge, Firefox)
+- Local development server running on `http://localhost:8000`
+- RP ID configured as `localhost` (not `127.0.0.1`)
+- Origin configured as `http://localhost:8000`
+
+### Test Flow
+
+1. Start the dev server:
+   ```bash
+   ./scripts/dev.sh
+   # or: uvicorn intake.app:app --reload --port 8000
+   ```
+
+2. Open http://localhost:8000/account in your browser
+
+3. The **Local Dev Debug** panel shows:
+   - RP ID and Origin configuration
+   - WebAuthn support status
+   - Session cookie status
+
+4. **Registration**: Click "Create Passkey" button
+   - Browser prompts for passkey creation (Touch ID / Windows Hello / Security Key)
+   - On success: "Passkey created successfully!"
+   - Page reloads showing signed-in state
+
+5. **Login**: If signed out, click "Sign In with Passkey"
+   - Browser prompts for passkey authentication
+   - On success: "Signed in successfully!"
+   - Session cookie is set
+
+6. **Logout**: Click "Sign Out" button
+   - Session is revoked server-side
+   - Session cookie is cleared
+
+### Supported Browsers
+
+| Browser | Passkey Support | Notes |
+|---------|----------------|-------|
+| Chrome | ✅ Yes | Works on macOS, Windows, Android |
+| Safari | ✅ Yes | Works on macOS, iOS (17+) |
+| Edge | ✅ Yes | Works on Windows, macOS |
+| Firefox | ✅ Yes | Works with security keys |
+
+### Known Browser Caveats
+
+- **Safari**: Requires macOS Ventura+ or iOS 17+. May not show passkey creation UI reliably on first attempt.
+- **Firefox**: Typically requires a hardware security key for passkey support.
+- **Chrome/Edge on Windows**: Uses Windows Hello if available.
+- **Chrome/Edge on macOS**: Uses Touch ID if available.
+- **IP addresses**: RP ID cannot be an IP address. Always use `localhost` for local dev.
+
+### Production Configuration
+
+For production deployment:
+```bash
+# Required settings
+INTAKE_ENV=production
+INTAKE_RP_ID=juliantorr.es
+INTAKE_ORIGIN=https://juliantorr.es
+INTAKE_SESSION_COOKIE_SECURE=true
+```
+
+## Current Authentication Limitations
+
+- Single-factor authentication only (passkey)
+- No multi-factor authentication support
+- No session refresh/rotation
+- No concurrent session limits per account
+- No IP-based session validation
+- No passkey backup/recovery flow
+- RP ID must be a domain string (use `localhost` for dev)
+
 ## Next Recommended Slice
 
 **Binary upload handling**: Secure upload of client-provided files with:
