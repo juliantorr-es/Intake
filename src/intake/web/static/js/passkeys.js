@@ -70,8 +70,8 @@ export async function registerPasskey(options) {
         const publicKeyCredentialCreationOptions = {
             challenge: challenge,
             rp: {
-                id: RP_CONFIG.id,
-                name: RP_CONFIG.name
+                id: options.rp.id,
+                name: options.rp.name
             },
             user: {
                 id: userId,
@@ -158,7 +158,7 @@ export async function authenticateWithPasskey(options) {
         
         const publicKeyCredentialRequestOptions = {
             challenge: challenge,
-            rpId: RP_CONFIG.id,
+            rpId: options.rp.id,
             allowCredentials: allowCredentials,
             userVerification: options.userVerification || 'preferred',
             extensions: options.extensions || {},

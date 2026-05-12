@@ -409,12 +409,40 @@ class PasskeyService:
             user_verification=UserVerificationRequirement.PREFERRED,
         )
 
+        # Convert allowed_credentials to JSON-serializable format
+        # allowed_credentials is a list of PublicKeyCredentialDescriptor objects
+        allow_credentials_serialized = None
+        if allowed_credentials:
+            allow_credentials_serialized = []
+            for cred in allowed_credentials:
+                # Convert PublicKeyCredentialDescriptor to dict
+                cred_dict = {
+                    "id": base64.urlsafe_b64encode(cred.id).decode(),
+                    "type": cred.type,
+                }
+                if cred.transports:
+                    # Convert transports enum values to strings
+                    transport_names = []
+                    for t in cred.transports:
+                        if hasattr(t, 'value'):
+                            transport_names.append(t.value)
+                        else:
+                            transport_names.append(str(t))
+                    if transport_names:
+                        cred_dict["transports"] = transport_names
+                allow_credentials_serialized.append(cred_dict)
+
         # Convert to our domain model (reusing PasskeyRegistrationOptions for convenience)
+        # For authentication, userVerification is a top-level field
         return PasskeyRegistrationOptions(
             challenge=stored_challenge.challenge,
             rp={"id": rp_config["id"], "name": rp_config["name"]},
             user={},  # User info not needed for authentication
             pubKeyCredParams=[{"type": "public-key", "alg": -257}],
+            authenticatorSelection={},
+            timeout=60000,
+            allowCredentials=allow_credentials_serialized,
+            userVerification="preferred",
         )
 
     def verify_authentication(self, credential_data: dict[str, Any]) -> tuple[Account, str]:

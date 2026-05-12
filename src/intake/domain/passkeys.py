@@ -154,7 +154,10 @@ class PasskeyCredential(BaseModel):
 
 
 class PasskeyRegistrationOptions(BaseModel):
-    """Options for passkey registration."""
+    """Options for passkey registration and authentication.
+    
+    This model is reused for both registration and authentication options.
+    """
 
     challenge: str
     rp: dict[str, Any]
@@ -164,6 +167,8 @@ class PasskeyRegistrationOptions(BaseModel):
     supportedAlgorithms: list[int] | None = None
     extensions: dict[str, Any] | None = None
     timeout: int | None = None
+    allowCredentials: list[dict[str, Any]] | None = None
+    userVerification: str | None = None
 
 
 class PasskeyVerification(BaseModel):
