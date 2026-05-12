@@ -2,21 +2,21 @@
 
 Passkey-gated, locally decryptable client intake platform for a freelance services website.
 
-Intake follows a split-brain architecture designed for maximum security of sensitive client data:
+Intake follows a split-brain architecture designed for maximum security and operational reliability:
 
-- **Hosted Intake (Public)**: A public-facing web backend that handles client interactions, authentication, and encrypted data storage. It acts as the system's "boring, always-on" presence.
-- **Local Intake Console (Local)**: A private, local management application (Rig-style) that manages the hosted backend, reviews sensitive client data, and controls site configuration.
-- **Intake Sync**: An outbound-only protocol between the Local Console and the Hosted Backend.
+- **Hosted Intake (Public)**: A hosted web backend serving the public website and API. It handles passkey authentication, email verification, quote submission (encrypted shells), and binary uploads. It is designed to be "boring, available, and public."
+- **Local Intake Console (Local)**: A private management app for operators. It connects outbound to the hosted backend, holds the private decryption keys, and manages site content, quote reviews, and service configurations.
+- **Intake Sync**: The narrow protocol connecting them via outbound polling/WebSocket clients.
 
 ### Core Boundaries
 
-- **No private keys in the public backend**: The hosted backend never holds the private decryption key for sensitive client data.
-- **Local-only decryption**: All sensitive quote payloads and exact locations are decrypted strictly within the Local Intake Console.
-- **Outbound-only sync**: The Local Console initiates all connections to the Hosted Backend (polling or WebSocket client); the hosted backend never connects inbound to a local machine.
+- **No private keys in the public backend**: The hosted backend never holds the private decryption key.
+- **Local-only decryption**: Sensitive data is only decrypted within the Local Intake Console.
+- **Outbound-only sync**: The local console initiates all connections; the hosted backend never connects inbound to a local machine.
+- **Diagnostic-only CLI**: Any CLI tools in the repository are for development and diagnostics only, not for product use.
 - **No passwords**: Passkey-first authentication only.
 - **Redacted public state**: Public APIs only expose non-sensitive summaries; full data is only available via the sync protocol to authenticated operator devices.
 
-- No passwords - passkey-first authentication only
 - No raw session tokens in storage
 - No plaintext sensitive data in long-term database
 - Encryption for readable sensitive data

@@ -79,3 +79,38 @@ def test_redaction_boundary():
     assert "ciphertext" not in data
     assert "encrypted_payload" not in data
     assert "exact_location" not in data
+
+
+def test_projection_forbids_extra_fields():
+    """Test that HostedQuoteProjection forbids extra fields to prevent leakage."""
+    now = datetime.now()
+    with pytest.raises(Exception):
+        # This should fail because of 'extra = "forbid"'
+        HostedQuoteProjection(
+            quote_id="quote-123",
+            status="submitted",
+            created_at=now,
+            updated_at=now,
+            has_encrypted_payload=True,
+            upload_count=0,
+            plaintext_exact_location="123 Main St" # Should be forbidden
+        )
+
+
+def test_projection_redacts_sensitive_content():
+    """Explicitly verify that sensitive content kinds are missing."""
+    now = datetime.now()
+    projection = HostedQuoteProjection(
+        quote_id="q1",
+        status="s1",
+        created_at=now,
+        updated_at=now,
+        has_encrypted_payload=True,
+        upload_count=5
+    )
+    
+    serialized = projection.model_dump_json()
+    assert "exact_location" not in serialized
+    assert "original_filename" not in serialized
+    assert "questionnaire" not in serialized
+    assert "cipher" not in serialized

@@ -4,8 +4,12 @@ import argparse
 import sys
 from typing import Any
 
+# WARNING: This CLI is for DEVELOPMENT and DIAGNOSTIC purposes only.
+# It is NOT a product surface and should not be used by end-users.
+# The actual management surface is the Local Intake Console application.
+
 from intake.config import get_settings
-from intake.operator_console.decrypt import decrypt_quote_payload
+from intake.local_console.decrypt_utils import decrypt_quote_payload
 from intake.storage.repositories import QuoteRepository
 
 
@@ -60,7 +64,7 @@ def show_quote(args: argparse.Namespace) -> int:
 
 def decrypt_quote(args: argparse.Namespace) -> int:
     """Decrypt and show sensitive quote payload."""
-    from intake.operator_console.decrypt import decrypt_quote_full
+    from intake.local_console.decrypt_utils import decrypt_quote_full
 
     try:
         result = decrypt_quote_full(args.quote_id)
