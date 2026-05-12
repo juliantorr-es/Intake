@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from intake.domain.projections import SafeQuoteSummary
+from intake.domain.time import utc_now
 from intake.domain.quotes import QuoteServiceLane, QuoteStatus
 from intake.services.quote_service import get_quote_service, QuoteService
 
@@ -144,7 +145,7 @@ async def add_location(
         raise HTTPException(status_code=404, detail="Quote not found")
 
     quote.general_service_area = request.general_service_area
-    quote.updated_at = datetime.utcnow()
+    quote.updated_at = utc_now()
     updated = service._repo.update(quote)
 
     if not updated:

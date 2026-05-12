@@ -15,7 +15,8 @@ dependencies = [
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "sqlmodel>=0.0.16",
-    "webauthn>=0.3.0",
+    # Duo Labs py_webauthn - package name is 'webauthn'
+    "webauthn>=2.0.0",
     "cryptography>=42.0.0",
     "python-dotenv>=1.0.0",
     "alembic>=1.13.0",

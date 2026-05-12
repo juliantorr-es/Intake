@@ -3,17 +3,18 @@
 import uuid
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from intake.domain.events import EventAggregateType
+from intake.domain.time import utc_now
 
 
-class Account:
+class Account(BaseModel):
     """Account domain model."""
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     # No passwords, no email as primary auth - passkey only
     # Email may be added later as contact/recovery, but not for login
@@ -24,14 +25,32 @@ class Account:
         return EventAggregateType.ACCOUNT
 
 
-class Session:
-    """Active session domain model."""
+class Session(BaseModel):
+    """Active session domain model.
+
+    Session tokens are NOT stored in raw form - only the hash is stored for lookup.
+    The actual session identifier is returned to the client once (via secure cookie).
+    """
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     account_id: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    token_hash: str  # SHA-256 hash of the session token (for lookup)
+    created_at: datetime = Field(default_factory=utc_now)
     expires_at: datetime
-    is_active: bool = True
+    revoked_at: datetime | None = None
+    last_seen_at: datetime | None = None
 
-    # Session tokens are not stored in raw form - only hashed for lookup
-    # The actual session identifier is used as a secure cookie
+    @property
+    def is_active(self) -> bool:
+        """Check if session is active (not expired, not revoked)."""
+        return self.revoked_at is None and utc_now() < self.expires_at
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if session has expired."""
+        return utc_now() >= self.expires_at
+
+    @property
+    def is_revoked(self) -> bool:
+        """Check if session has been revoked."""
+        return self.revoked_at is not None

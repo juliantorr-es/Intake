@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import Any
 
 from intake.domain.events import EventActorType, EventType
+from intake.domain.time import utc_now
 from intake.domain.quotes import (
     Quote,
     QuoteServiceLane,
@@ -73,7 +74,7 @@ class QuoteService:
             return None
 
         quote.service_lane = service_lane
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
         return self._repo.update(quote)
 
     def add_basic_info(
@@ -91,7 +92,7 @@ class QuoteService:
         quote.short_summary = short_summary
         quote.detailed_description = detailed_description
         quote.preferred_timeline = preferred_timeline
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
         return self._repo.update(quote)
 
     def add_location(
@@ -114,7 +115,7 @@ class QuoteService:
         encrypted = self._crypto.encrypt_json({"location": exact_location})
         quote.encrypted_exact_location = encrypted
 
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
         updated = self._repo.update(quote)
 
         # Log the event
@@ -142,7 +143,7 @@ class QuoteService:
         encrypted = self._crypto.encrypt_json({"notes": access_notes})
         quote.encrypted_access_notes = encrypted
 
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
         updated = self._repo.update(quote)
 
         # Log the event (with generic summary, no sensitive data)
@@ -170,7 +171,7 @@ class QuoteService:
         encrypted = self._crypto.encrypt_json(answers)
         quote.encrypted_questionnaire = encrypted
 
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
         updated = self._repo.update(quote)
 
         # Log the event
@@ -211,7 +212,7 @@ class QuoteService:
         )
 
         quote.upload_declarations.append(upload)
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
 
         # Note: In a full implementation, we'd encrypt the filename before storage
         # For this bootstrap, we're declaring the upload but not encrypting the metadata yet
@@ -241,7 +242,7 @@ class QuoteService:
 
         quote.status = QuoteStatus.SUBMITTED
         quote.account_id = account_id
-        quote.updated_at = datetime.utcnow()
+        quote.updated_at = utc_now()
 
         updated = self._repo.update(quote)
 
@@ -252,7 +253,7 @@ class QuoteService:
             # Transition to needs_review (could be automatic or manual)
             # For bootstrap, we'll auto-transition to NEEDS_REVIEW
             updated.status = QuoteStatus.NEEDS_REVIEW
-            updated.updated_at = datetime.utcnow()
+            updated.updated_at = utc_now()
             self._repo.update(updated)
 
             self._event_log.log_quote_status_change(

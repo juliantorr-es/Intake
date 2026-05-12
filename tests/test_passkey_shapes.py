@@ -7,12 +7,14 @@ from datetime import datetime, timedelta
 import pytest
 
 from intake.domain.passkeys import (
+    ChallengeAction,
     PasskeyChallenge,
     PasskeyChallengeStatus,
     PasskeyCredential,
     PasskeyRegistrationOptions,
     PasskeyType,
 )
+from intake.domain.time import utc_now
 
 
 def test_passkey_challenge_creation():
@@ -65,8 +67,9 @@ def test_passkey_challenge_is_valid():
         challenge=base64.b64encode(uuid.uuid4().bytes).decode(),
         rp_id="localhost",
         origin="http://localhost:8000",
-        created_at=datetime.utcnow(),
-        expires_at=datetime.utcnow() + timedelta(minutes=5),
+        action=ChallengeAction.REGISTER,
+        created_at=utc_now(),
+        expires_at=utc_now() + timedelta(minutes=5),
     )
 
     assert challenge.is_valid is True
@@ -79,8 +82,9 @@ def test_passkey_challenge_is_not_valid_consumed():
         challenge=base64.b64encode(uuid.uuid4().bytes).decode(),
         rp_id="localhost",
         origin="http://localhost:8000",
-        created_at=datetime.utcnow(),
-        expires_at=datetime.utcnow() + timedelta(minutes=5),
+        action=ChallengeAction.REGISTER,
+        created_at=utc_now(),
+        expires_at=utc_now() + timedelta(minutes=5),
         status=PasskeyChallengeStatus.CONSUMED,
     )
 
@@ -94,8 +98,9 @@ def test_passkey_challenge_is_not_valid_expired():
         challenge=base64.b64encode(uuid.uuid4().bytes).decode(),
         rp_id="localhost",
         origin="http://localhost:8000",
-        created_at=datetime.utcnow() - timedelta(minutes=10),
-        expires_at=datetime.utcnow() - timedelta(minutes=5),
+        action=ChallengeAction.REGISTER,
+        created_at=utc_now() - timedelta(minutes=10),
+        expires_at=utc_now() - timedelta(minutes=5),
     )
 
     assert challenge.is_valid is False
@@ -134,13 +139,13 @@ def test_passkey_credential_creation():
     credential = PasskeyCredential(
         credential_id=base64.b64encode(b"credential-id").decode(),
         public_key=base64.b64encode(b"public-key-data").decode(),
-        counter=0,
+        sign_count=0,
         account_id="account-123",
     )
 
     assert credential.credential_id == base64.b64encode(b"credential-id").decode()
     assert credential.public_key == base64.b64encode(b"public-key-data").decode()
-    assert credential.counter == 0
+    assert credential.sign_count == 0
     assert credential.account_id == "account-123"
     assert credential.credential_type == PasskeyType.PUBLIC_KEY
     assert credential.registered_at is not None

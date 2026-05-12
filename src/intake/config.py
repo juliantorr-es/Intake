@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # Database
     intake_database_url: str = Field(
-        default="sqlite:///./.build/intake/local.db"
+        default="sqlite:///:memory:"
     )
 
     # Development encryption key (32-byte URL-safe base64)
@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     intake_session_secret: SecretStr | None = Field(
         default=None
     )
+
+    # Session cookie configuration
+    intake_session_cookie_name: str = Field(default="intake_session")
+    intake_session_cookie_secure: bool | None = Field(default=None)
+    intake_session_cookie_httponly: bool = Field(default=True)
+    intake_session_cookie_samesite: str = Field(default="lax")
+    intake_session_ttl_seconds: int = Field(default=24 * 60 * 60)  # 24 hours
 
     # Challenge expiry in seconds
     intake_challenge_expiry: int = Field(default=300)
@@ -57,18 +64,38 @@ class Settings(BaseSettings):
         """Check if running in local development environment."""
         return self.intake_env == "local"
 
+    @property
+    def session_cookie_secure(self) -> bool:
+        """Get effective session cookie Secure flag.
+        
+        Returns True in production, False in local unless explicitly set.
+        """
+        if self.intake_session_cookie_secure is not None:
+            return self.intake_session_cookie_secure
+        return self.is_production
+
     def ensure_build_dir(self) -> Path:
-        """Ensure the build directory exists."""
-        build_path = Path(".build/intake")
+        """Ensure the build/data directory exists."""
+        build_path = Path("/var/tmp/intake")
         build_path.mkdir(parents=True, exist_ok=True)
         return build_path
 
     def get_database_url_for_sqlmodel(self) -> str:
         """Get database URL compatible with SQLModel/SQLAlchemy."""
         url = self.intake_database_url
-        # Replace sqlite:/// with sqlite://// for absolute paths
         if url.startswith("sqlite:///"):
-            url = "sqlite:///" + os.path.abspath(url[11:])
+            # Ensure the data directory exists
+            self.ensure_build_dir()
+            # For sqlite:///, the path after the prefix should be absolute
+            # If it starts with /, keep it as-is with 4 slashes
+            # If it's relative, make it absolute with 4 slashes
+            path = url[10:]  # Remove "sqlite://"
+            if path.startswith("/"):
+                # Already absolute path, use 4 slashes
+                url = "sqlite://" + path
+            else:
+                # Relative path, make absolute
+                url = "sqlite:///" + os.path.abspath(path)
         return url
 
 

@@ -162,3 +162,64 @@ Quote intake supports these service lanes:
 draft -> submitted -> needs_review -> reviewing -> quoted -> accepted -> closed
                                    -> quoted -> declined -> closed
 ```
+
+## Timezone Policy
+
+All datetimes in Intake are **timezone-aware UTC** (`datetime(timezone.utc)`).
+
+- Use `utc_now()` from `intake.domain.time` for current time
+- Use `utc_expires_in(seconds)` for future expiry times
+- Never use `datetime.utcnow()` (deprecated, returns naive datetime)
+- All timestamps stored in the database are UTC
+- All datetime comparisons are done with aware datetimes
+
+This ensures consistent time handling across all components and avoids mixing naive and aware datetimes.
+
+## Session Cookie Policy
+
+Session cookies are configured centrally via environment variables:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `INTAKE_SESSION_COOKIE_NAME` | `intake_session` | Cookie name |
+| `INTAKE_SESSION_COOKIE_HTTPONLY` | `true` | Prevent JavaScript access |
+| `INTAKE_SESSION_COOKIE_SAMESITE` | `lax` | CSRF protection level |
+| `INTAKE_SESSION_TTL_SECONDS` | `86400` (24h) | Session lifetime |
+
+### Local vs Production
+
+- **Local development** (`INTAKE_ENV=local`): `Secure=false` is allowed for `http://localhost`
+- **Production** (`INTAKE_ENV=production`): `Secure=true` is enforced, requiring HTTPS
+
+Override by explicitly setting `INTAKE_SESSION_COOKIE_SECURE=true/false`.
+
+### Security Properties
+
+- **HttpOnly**: Always `true` - prevents XSS attacks from stealing cookies
+- **SameSite**: `lax` by default - balances security and usability
+- **Secure**: Auto-detected based on environment, or explicitly configured
+- **Scope**: Session cookies reference session IDs only, never raw tokens
+
+### Raw Token Handling
+
+- Raw session tokens are **NEVER stored** in the database
+- Only SHA-256 hash of the token is stored for lookup
+- The raw token is returned to the client once via secure cookie
+- Logout clears the cookie and revokes the session server-side
+
+## Current Authentication Limitations
+
+- Single-factor authentication only (passkey)
+- No multi-factor authentication support
+- No session refresh/rotation
+- No concurrent session limits
+- No IP-based session validation
+- RP ID must be a domain string (use `localhost` for dev)
+
+## Next Recommended Slice
+
+**Binary upload handling**: Secure upload of client-provided files with:
+- Size limits and content type validation
+- Server-side storage or object storage integration
+- Encryption of uploaded files at rest
+- Cleanup of expired/unreferenced uploads

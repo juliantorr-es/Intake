@@ -7,6 +7,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from intake.domain.time import utc_now
+
 
 class EventAggregateType(StrEnum):
     """Types of aggregates that can have events."""
@@ -61,7 +63,7 @@ class Event(BaseModel):
     aggregate_type: EventAggregateType
     aggregate_id: str
     event_type: EventType
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     actor_type: EventActorType | None = None
     actor_id: str | None = None
     redacted_summary: str = ""

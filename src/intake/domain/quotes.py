@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from intake.domain.crypto import EncryptedPayload
 from intake.domain.events import EventAggregateType
+from intake.domain.time import utc_now
 
 
 class QuoteServiceLane(StrEnum):
@@ -40,7 +41,7 @@ class UploadDeclaration(BaseModel):
     original_filename: str  # Encrypted in storage
     content_type: str
     size_bytes: int
-    declaration_time: datetime = Field(default_factory=datetime.utcnow)
+    declaration_time: datetime = Field(default_factory=utc_now)
     purpose: str = ""  # e.g., "portfolio", "reference", "example"
 
 
@@ -48,8 +49,8 @@ class Quote(BaseModel):
     """Quote domain model."""
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     # Account that created this quote
     account_id: str | None = None

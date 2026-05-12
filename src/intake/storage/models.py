@@ -8,8 +8,9 @@ from sqlmodel import Field, SQLModel, Column, JSON, TEXT
 
 from intake.domain.crypto import EncryptedPayload
 from intake.domain.events import EventAggregateType, EventType, EventActorType
-from intake.domain.passkeys import PasskeyChallengeStatus, PasskeyType
+from intake.domain.passkeys import ChallengeAction, PasskeyChallengeStatus, PasskeyType
 from intake.domain.quotes import QuoteServiceLane, QuoteStatus, UploadDeclaration
+from intake.domain.time import utc_now
 
 
 # ========== Account Models ==========
@@ -21,11 +22,49 @@ class AccountModel(SQLModel, table=True):
     __tablename__ = "accounts"
 
     id: str = Field(default=None, primary_key=True, index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+# ========== Session Models ==========
+
+
+class SessionModel(SQLModel, table=True):
+    """Session database model.
+
+    Only stores hashed session tokens for lookup. Never stores raw tokens.
+    """
+
+    __tablename__ = "sessions"
+
+    id: str = Field(default=None, primary_key=True, index=True)
+    account_id: str = Field(foreign_key="accounts.id", index=True)
+    token_hash: str = Field(index=True)  # SHA-256 hash for lookup
+    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime = Field(index=True)
+    revoked_at: datetime | None = Field(default=None, index=True)
+    last_seen_at: datetime | None = Field(default=None)
 
 
 # ========== Passkey Models ==========
+
+
+class PasskeyChallengeModel(SQLModel, table=True):
+    """Passkey challenge database model for WebAuthn ceremonies."""
+
+    __tablename__ = "passkey_challenges"
+
+    id: str = Field(default=None, primary_key=True, index=True)
+    challenge: str = Field()  # Base64-encoded challenge value
+    rp_id: str = Field(index=True)
+    origin: str = Field(index=True)
+    action: ChallengeAction = Field(index=True)  # register or login
+    status: PasskeyChallengeStatus = Field(default=PasskeyChallengeStatus.PENDING, index=True)
+    account_id: str | None = Field(default=None, foreign_key="accounts.id", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    expires_at: datetime = Field(index=True)
+    consumed_at: datetime | None = Field(default=None, index=True)
+    attempt_count: int = Field(default=0)
 
 
 class PasskeyCredentialModel(SQLModel, table=True):
@@ -36,28 +75,18 @@ class PasskeyCredentialModel(SQLModel, table=True):
     id: str = Field(default=None, primary_key=True, index=True)
     credential_id: str = Field(index=True)  # Base64-encoded, hashed for lookup
     public_key: str = Field(sa_column=Column(TEXT))  # Base64-encoded
-    counter: int = Field(default=0)
+    sign_count: int = Field(default=0)  # Anti-replay counter
     credential_type: PasskeyType = Field(default=PasskeyType.PUBLIC_KEY)
     account_id: str = Field(foreign_key="accounts.id", index=True)
-    registered_at: datetime = Field(default_factory=datetime.utcnow)
+    registered_at: datetime = Field(default_factory=utc_now)
     last_used_at: datetime | None = Field(default=None)
     name: str | None = Field(default=None)
-
-
-# ========== Session Models ==========
-
-
-class SessionModel(SQLModel, table=True):
-    """Session database model."""
-
-    __tablename__ = "sessions"
-
-    id: str = Field(default=None, primary_key=True, index=True)
-    account_id: str = Field(foreign_key="accounts.id", index=True)
-    session_hash: str = Field(index=True)  # Hashed session token for lookup
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    expires_at: datetime = Field(index=True)
-    is_active: bool = Field(default=True)
+    # WebAuthn metadata
+    transports: str | None = Field(default=None, sa_column=Column(JSON))  # List of transports
+    backup_eligible: bool = Field(default=False)
+    backup_state: bool = Field(default=False)
+    device_label: str | None = Field(default=None)
+    revoked_at: datetime | None = Field(default=None, index=True)
 
 
 # ========== Quote Models ==========
@@ -74,7 +103,7 @@ class UploadDeclarationModel(SQLModel, table=True):
     encrypted_filename: str = Field(sa_column=Column(TEXT))  # Encrypted original filename
     content_type: str = Field(default="")
     size_bytes: int = Field(default=0)
-    declaration_time: datetime = Field(default_factory=datetime.utcnow)
+    declaration_time: datetime = Field(default_factory=utc_now)
     purpose: str = Field(default="")
     encrypted_metadata: str | None = Field(
         default=None, sa_column=Column(JSON)
@@ -88,8 +117,8 @@ class QuoteModel(SQLModel, table=True):
 
     id: str = Field(default=None, primary_key=True, index=True)
     account_id: str | None = Field(default=None, foreign_key="accounts.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
 
     # Service lane
     service_lane: QuoteServiceLane | None = Field(default=None)
@@ -149,7 +178,8 @@ class QuoteModel(SQLModel, table=True):
         )
 
     def to_domain(self) -> Any:
-        """Convert to domain model. Returns dict for now, will be Quote once circular import is resolved."""
+        """Convert to domain model."""
+        from intake.domain.crypto import EncryptedPayload
         from intake.domain.quotes import Quote
 
         encrypted_location = None
@@ -195,7 +225,7 @@ class EventModel(SQLModel, table=True):
     aggregate_type: EventAggregateType = Field(index=True)
     aggregate_id: str = Field(index=True)
     event_type: EventType = Field(index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
     actor_type: EventActorType | None = Field(default=None)
     actor_id: str | None = Field(default=None, index=True)
     redacted_summary: str = Field(default="")
@@ -232,6 +262,7 @@ class EventModel(SQLModel, table=True):
 
     def to_domain(self) -> Any:
         """Convert to domain model."""
+        from intake.domain.crypto import EncryptedPayload
         from intake.domain.events import Event
 
         encrypted_payload = None
@@ -247,5 +278,5 @@ class EventModel(SQLModel, table=True):
             actor_type=self.actor_type,
             actor_id=self.actor_id,
             redacted_summary=self.redacted_summary,
-            encrypted_payload={"ciphertext": encrypted_payload.ciphertext, "nonce": encrypted_payload.nonce, "tag": encrypted_payload.tag, "algorithm": encrypted_payload.algorithm, "key_version": encrypted_payload.key_version} if encrypted_payload else None,
+            encrypted_payload=json.dumps(encrypted_payload.model_dump()) if encrypted_payload else None,
         )

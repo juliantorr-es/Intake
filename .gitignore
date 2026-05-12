@@ -55,6 +55,7 @@ dmypy.json
 *.db
 *.sqlite
 *.sqlite3
+:memory:
 
 # Logs
 *.log

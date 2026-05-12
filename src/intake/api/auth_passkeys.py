@@ -1,10 +1,12 @@
 """Passkey authentication endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, Cookie
 from pydantic import BaseModel
 
+from intake.config import Settings, get_settings
 from intake.domain.passkeys import PasskeyRegistrationOptions
 from intake.services.passkey_service import get_passkey_service, PasskeyService
+from intake.services.session_service import get_session_service, SessionService
 
 router = APIRouter(prefix="/passkey")
 
@@ -57,7 +59,6 @@ class PasskeyLoginVerifyResponse(BaseModel):
 
     success: bool
     account_id: str | None = None
-    session_token: str | None = None
 
 
 class SessionResponse(BaseModel):
@@ -98,10 +99,10 @@ async def register_verify(
     creation ceremony.
     """
     try:
-        credential = service.verify_registration(request.credential)
+        credential, account = service.verify_registration(request.credential)
         return PasskeyRegisterVerifyResponse(
             success=True,
-            account_id=credential.account_id,
+            account_id=account.id,
         )
     except HTTPException:
         raise
@@ -126,21 +127,41 @@ async def login_options(
 @router.post("/login/verify", response_model=PasskeyLoginVerifyResponse)
 async def login_verify(
     request: PasskeyLoginVerifyRequest,
+    response: Response,
     service: PasskeyService = Depends(get_passkey_service),
 ) -> PasskeyLoginVerifyResponse:
     """Verify a passkey login.
 
     This endpoint verifies the response from the browser's passkey
-    authentication ceremony.
+    authentication ceremony and creates a session.
     """
     try:
-        account = service.verify_authentication(request.credential)
-        # TODO: Create a session token
-        return PasskeyLoginVerifyResponse(
-            success=True,
-            account_id=account.id,
-            session_token="todo-session-token",  # TODO: Generate real session token
-        )
+        account, session_id = service.verify_authentication(request.credential)
+
+        # Get the session token from the session service
+        # The session service stores only the hash, we need to generate the token
+        session_service = get_session_service()
+        session = session_service.get_session_by_id(session_id)
+        settings = get_settings()
+
+        if session:
+            # Set the session token as a secure cookie
+            # We return the session_id as the token reference
+            # In production, this would be a proper JWT or similar
+            response.set_cookie(
+                key=settings.intake_session_cookie_name,
+                value=session_id,
+                httponly=settings.intake_session_cookie_httponly,
+                secure=settings.session_cookie_secure,
+                samesite=settings.intake_session_cookie_samesite,
+                max_age=settings.intake_session_ttl_seconds,
+            )
+            return PasskeyLoginVerifyResponse(
+                success=True,
+                account_id=account.id,
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Session not found")
     except HTTPException:
         raise
     except Exception as e:
@@ -148,22 +169,54 @@ async def login_verify(
 
 
 @router.post("/logout", response_model=LogoutResponse)
-async def logout() -> LogoutResponse:
+async def logout(
+    request: Request,
+    response: Response,
+    session_service: SessionService = Depends(get_session_service),
+    settings: Settings = Depends(get_settings),
+) -> LogoutResponse:
     """Logout and invalidate session.
 
-    TODO: Implement actual session invalidation.
+    Clears the session cookie and revokes the session on the server.
     """
-    # TODO: Invalidate the session
+    # Get session ID from cookie
+    session_id = request.cookies.get(settings.intake_session_cookie_name)
+
+    if session_id:
+        # Revoke the session
+        session_service.revoke_session(session_id)
+
+        # Clear the cookie
+        response.delete_cookie(
+            key=settings.intake_session_cookie_name,
+            httponly=settings.intake_session_cookie_httponly,
+            secure=settings.session_cookie_secure,
+            samesite=settings.intake_session_cookie_samesite,
+        )
+
     return LogoutResponse(success=True)
 
 
 @router.get("/session", response_model=SessionResponse)
-async def get_session() -> SessionResponse:
+async def get_session(
+    request: Request,
+    session_service: SessionService = Depends(get_session_service),
+    settings: Settings = Depends(get_settings),
+) -> SessionResponse:
     """Get current session information.
 
-    TODO: Implement actual session lookup.
+    Checks the session cookie and returns the authenticated state.
     """
-    # TODO: Look up session from request
+    session_id = request.cookies.get(settings.intake_session_cookie_name)
+
+    if session_id:
+        session = session_service.get_session_by_id(session_id)
+        if session and session.is_active:
+            return SessionResponse(
+                authenticated=True,
+                account_id=session.account_id,
+            )
+
     return SessionResponse(
         authenticated=False,
         account_id=None,

@@ -36,7 +36,9 @@ def reset_engine() -> None:
 def get_session() -> Generator[Session, None, None]:
     """Get a database session."""
     engine = get_engine()
-    session = Session(engine)
+    # expire_on_commit=False allows models to remain accessible after commit
+    # This is useful for repositories that return models directly
+    session = Session(engine, expire_on_commit=False)
     try:
         yield session
         session.commit()
