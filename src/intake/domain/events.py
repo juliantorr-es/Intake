@@ -16,6 +16,8 @@ class EventAggregateType(StrEnum):
     ACCOUNT = auto()
     PASSKEY = auto()
     QUOTE = auto()
+    COST_SCENARIO = auto()
+    COST_RECEIPT = auto()
 
 
 class EventType(StrEnum):
@@ -54,6 +56,15 @@ class EventType(StrEnum):
     QUOTE_UPLOAD_SESSION_CREATED = auto()
     QUOTE_UPLOAD_SESSION_EXPIRED = auto()
     QUOTE_UPLOAD_RECEIPT_RECEIVED = auto()
+
+    # Cost Ledger events
+    COST_SCENARIO_CREATED = auto()
+    COST_SCENARIO_UPDATED = auto()
+    COST_SCENARIO_DELETED = auto()
+    COST_LINE_ITEM_ADDED = auto()
+    COST_ASSUMPTION_ADDED = auto()
+    COST_SNAPSHOT_CREATED = auto()
+    COST_RECEIPT_GENERATED = auto()
 
 
 class EventActorType(StrEnum):

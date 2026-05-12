@@ -187,6 +187,50 @@ Quote intake supports these service lanes:
 - `practical_help` - Hands-on assistance
 - `unsure` - Unsure of needs
 
+## Vendor Cost Ledger
+
+The **Vendor Cost Ledger** is a manual cost estimation system for deployment planning. It supports Intake's anti-predatory-SaaS value proposition by making infrastructure cost assumptions visible and auditible.
+
+### Key Features
+
+- **Manual calculation** from known pricing facts - no automatic scraping or API calls
+- **Assumption tracking** for all estimates
+- **Source snapshots** with timestamps for audit trail
+- **Receipt generation** with explicit disclaimers
+- **Separation** of provider costs from Intake license/support costs
+
+### Usage
+
+Access via the Local Console at `/costs`:
+
+```bash
+# Navigate to Cost Ledger in Local Console
+# or via API
+curl http://127.0.0.1:8000/api/local/costs/providers
+curl http://127.0.0.1:8000/api/local/costs/scenarios
+```
+
+### Supported Providers
+
+- Railway
+- Render
+- Fly
+- Cloudflare R2
+- Google Drive
+- Tailscale
+- Cloudflare Tunnel
+- Self-hosted
+- Custom
+
+### Important Notes
+
+- **Pricing may change** - All receipts include this disclaimer
+- **Sources required** - Every fact includes a source URL or manual marker
+- **Timestamps required** - Every snapshot records when it was captured
+- **No credentials** - Provider tokens/secrets are never stored in the ledger
+
+See [Vendor Cost Ledger Architecture](docs/architecture/vendor_cost_ledger.md) for details.
+
 ## Quote Status Flow
 
 ```

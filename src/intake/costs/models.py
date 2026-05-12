@@ -145,6 +145,21 @@ class VendorProvider(BaseModel):
     supports_api_calculator: bool = False
     is_active: bool = True
     notes: str = ""
+    
+    def get_safe_display(self) -> dict[str, Any]:
+        """Return safe display with no sensitive data."""
+        return {
+            "kind": self.kind.value,
+            "display_name": self.display_name,
+            "description": self.description,
+            "website_url": self.website_url,
+            "pricing_url": self.pricing_url,
+            "documentation_url": self.documentation_url,
+            "category": self.category,
+            "supports_manual_calculator": self.supports_manual_calculator,
+            "supports_api_calculator": self.supports_api_calculator,
+            "is_active": self.is_active,
+        }
 
 
 class VendorPricingFact(BaseModel):

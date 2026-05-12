@@ -78,6 +78,9 @@ class CostCalculator:
         # Receipt storage
         self._receipts: dict[str, VendorCostReceipt] = {}
         
+        # Standalone snapshot storage (snapshots can also be part of scenarios)
+        self._snapshots: dict[str, CostSourceSnapshot] = {}
+        
         # Initialize with default providers
         self._initialize_default_providers()
     
@@ -504,7 +507,11 @@ class CostCalculator:
         notes: str = "",
         captured_by: Optional[str] = None,
     ) -> CostSourceSnapshot:
-        """Add a source snapshot."""
+        """Add a source snapshot.
+        
+        Snapshots are stored both standalone (for listing) and can be
+        embedded in scenarios/receipts for context.
+        """
         snapshot = CostSourceSnapshot(
             snapshot_id=uuid4().hex,
             source_url=source_url,
@@ -515,8 +522,17 @@ class CostCalculator:
             notes=notes,
             captured_by=captured_by,
         )
-        # Note: We don't store the snapshot in a registry; it's embedded in scenarios/receipts
+        # Store in registry for listing
+        self._snapshots[snapshot.snapshot_id] = snapshot
         return snapshot
+    
+    def list_snapshots(self) -> list[CostSourceSnapshot]:
+        """List all standalone source snapshots."""
+        return list(self._snapshots.values())
+    
+    def get_snapshot(self, snapshot_id: str) -> Optional[CostSourceSnapshot]:
+        """Get a specific snapshot by ID."""
+        return self._snapshots.get(snapshot_id)
     
     # =========================================================================
     # Receipt Generation
