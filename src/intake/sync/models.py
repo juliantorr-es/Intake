@@ -78,6 +78,8 @@ class HostedQuoteProjection(BaseModel):
     updated_at: datetime
     has_encrypted_payload: bool
     upload_count: int
+    email_verified: bool = False
+    decrypted: bool = False
     
     @classmethod
     def from_domain(cls, quote: Any) -> "HostedQuoteProjection":
@@ -89,7 +91,9 @@ class HostedQuoteProjection(BaseModel):
             created_at=quote.created_at,
             updated_at=quote.updated_at,
             has_encrypted_payload=bool(quote.encrypted_exact_location),
-            upload_count=len(quote.uploads) if hasattr(quote, "uploads") else 0
+            upload_count=len(quote.uploads) if hasattr(quote, "uploads") else 0,
+            email_verified=getattr(quote, "email_verified", False),
+            decrypted=False # Only Local Console knows if it's decrypted
         )
 
     # Explicitly excluding sensitive fields to prevent accidental leakage

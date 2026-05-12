@@ -64,7 +64,7 @@ def test_quote_review_model_redaction():
 
 @pytest.fixture(autouse=True)
 def setup_settings():
-    from intake.config import get_settings
+    from intake.config import get_settings, reset_settings
     from pydantic import SecretStr
     from intake.services.signing_service import LocalDeviceSigningService
     settings = get_settings()
@@ -72,7 +72,7 @@ def setup_settings():
     signer = LocalDeviceSigningService()
     settings.intake_local_signing_key = SecretStr(signer.get_private_key_base64())
     yield
-    settings.intake_local_signing_key = None
+    reset_settings()
 
 def test_get_quotes_pending_api(monkeypatch):
     # Mock the service to avoid network calls

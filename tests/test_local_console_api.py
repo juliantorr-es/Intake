@@ -10,6 +10,12 @@ from intake.config import get_settings, reset_settings
 from intake.local_console.review_service import LocalQuoteReviewService, LocalDecryptedQuoteReview
 from intake.sync.models import HostedQuoteProjection
 
+@pytest.fixture(autouse=True)
+def setup_settings():
+    from intake.config import reset_settings
+    yield
+    reset_settings()
+
 @pytest.fixture
 def client():
     return TestClient(app)
