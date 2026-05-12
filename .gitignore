@@ -65,5 +65,9 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Swift
+.swiftpm/
+DerivedData/
+
 # Local overrides
 .intake.local

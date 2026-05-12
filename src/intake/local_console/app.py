@@ -44,7 +44,13 @@ def run_server(port):
 
 def main():
     """Start the local console app."""
-    port = find_free_port()
+    # Use environment variable or find a free port
+    env_port = os.environ.get("INTAKE_LOCAL_PORT")
+    if env_port:
+        port = int(env_port)
+    else:
+        port = find_free_port()
+    
     url = f"http://127.0.0.1:{port}"
     
     # Start server in a background thread

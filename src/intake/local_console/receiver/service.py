@@ -320,12 +320,18 @@ class LocalReceiverService:
             ext = ext.lower()
             
             if ext:
-                # Normalize
-                if ext.startswith("."):
-                    ext = ext[1:]
+                # Keep the dot for consistency with our allowlists
+                # ALLOWED_EXTENSIONS has keys like ".jpg", ".png"
+                if not ext.startswith("."):
+                    ext = f".{ext}"
                 
                 # Validate against session rules
-                if ext not in session.allowed_extensions and ext not in ALLOWED_EXTENSIONS:
+                # Normalize session extensions to also have dots
+                normalized_session_extensions = set(
+                    e if e.startswith(".") else f".{e}" for e in session.allowed_extensions
+                )
+                
+                if ext not in normalized_session_extensions and ext not in ALLOWED_EXTENSIONS:
                     return None, FileRejectionReason.DISALLOWED_EXTENSION
                 
                 # Check extension matches content type
@@ -334,7 +340,8 @@ class LocalReceiverService:
                     if declared_ct != expected_ct:
                         return None, FileRejectionReason.EXTENSION_MISMATCH
                 
-                extension = ext
+                # Store without dot for the file record
+                extension = ext.lstrip(".")
             else:
                 # No extension in filename - might still be valid if content type only
                 pass
@@ -372,7 +379,7 @@ class LocalReceiverService:
         )
         
         if rejection:
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=rejection,
                 error_message=f"File rejected: {rejection.value}",
@@ -482,7 +489,7 @@ class LocalReceiverService:
         )
         
         if rejection and rejection != FileRejectionReason.EMPTY_FILE:
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=rejection,
                 error_message=f"File rejected: {rejection.value}",
@@ -505,7 +512,7 @@ class LocalReceiverService:
                 file_obj=file_obj,
             )
         except ValueError as e:
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=FileRejectionReason.INVALID_SESSION,
                 error_message=str(e),
@@ -514,7 +521,7 @@ class LocalReceiverService:
         
         # Re-validate with actual size
         if actual_size == 0:
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=FileRejectionReason.EMPTY_FILE,
                 error_message="File is empty",
@@ -524,7 +531,7 @@ class LocalReceiverService:
         if actual_size > session.max_file_size_bytes:
             # Clean up the file we just stored
             self.storage.delete_file(session_id, file_id, extension)
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=FileRejectionReason.OVER_SIZE_LIMIT,
                 error_message=f"File too large: {actual_size} > {session.max_file_size_bytes}",
@@ -534,7 +541,7 @@ class LocalReceiverService:
         # Check total bytes
         if session.total_bytes_uploaded + actual_size > session.max_total_bytes:
             self.storage.delete_file(session_id, file_id, extension)
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=FileRejectionReason.MAX_TOTAL_BYTES_EXCEEDED,
                 error_message="Session total bytes exceeded",
@@ -544,7 +551,7 @@ class LocalReceiverService:
         # Re-check file count (might have changed during upload)
         if len(session.uploaded_files) >= session.max_files:
             self.storage.delete_file(session_id, file_id, extension)
-            return LocalUploadedFileRecord(file_id=""), UploadRejectionResponse(
+            return None, UploadRejectionResponse(
                 rejected=True,
                 reason=FileRejectionReason.MAX_FILES_EXCEEDED,
                 error_message="Maximum files exceeded",

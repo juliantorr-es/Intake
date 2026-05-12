@@ -15,6 +15,13 @@ from intake.local_console.receiver.service import LocalReceiverService
 router = APIRouter()
 
 
+@router.get("/health")
+async def health():
+    """Simple health check endpoint."""
+    return {"status": "ok"}
+
+
+
 # Receiver service singleton
 _receiver_service: Optional[LocalReceiverService] = None
 
@@ -38,6 +45,10 @@ class LocalStatusResponse(BaseModel):
     encryption_key_configured: bool
     signing_key_configured: bool
     is_loopback: bool
+    # Tunnel adapter status
+    tunnel_adapter_status: Optional[str] = "not_configured"
+    tailscale_funnel_status: Optional[str] = None
+    cloudflare_tunnel_status: Optional[str] = None
 
 
 class ProviderStatusResponse(BaseModel):
@@ -59,6 +70,12 @@ class DeployReadinessResponse(BaseModel):
     upload_receiver_status: Optional[str] = "online"
     upload_receiver_loopback_only: bool = True
     fallback_storage_configured: bool = False
+    # Tunnel adapter status
+    tunnel_adapters_configured: bool = True
+    tailscale_funnel_configured: bool = False
+    cloudflare_tunnel_configured: bool = False
+    tunnel_exposure_enabled: bool = False
+    tunnel_loopback_only: bool = True
     recommended_next_step: str = "install_railway_cli"
     dry_run_only: bool = True
 
@@ -82,13 +99,30 @@ async def get_status():
     """Get status of the local console."""
     settings = get_settings()
     
+    # Get tunnel adapter status
+    tailscale_status = None
+    cloudflare_status = None
+    try:
+        from intake.deploy.tunnel_adapters import get_tunnel_adapter_service
+        tunnel_svc = get_tunnel_adapter_service()
+        plans = tunnel_svc.get_all_plans()
+        if plans.tailscale:
+            tailscale_status = plans.tailscale.readiness.value
+        if plans.cloudflare:
+            cloudflare_status = plans.cloudflare.readiness.value
+    except Exception:
+        pass
+    
     # Redact tokens/keys: only show if they exist
     return LocalStatusResponse(
         hosted_url=settings.intake_base_url,
         sync_auth_configured=bool(settings.intake_local_sync_token),
         encryption_key_configured=bool(settings.intake_dev_encryption_key),
         signing_key_configured=bool(settings.intake_local_signing_key),
-        is_loopback=True # API should only be reachable via 127.0.0.1
+        is_loopback=True,  # API should only be reachable via 127.0.0.1
+        tunnel_adapter_status="active",
+        tailscale_funnel_status=tailscale_status,
+        cloudflare_tunnel_status=cloudflare_status,
     )
 
 
@@ -161,6 +195,20 @@ async def get_deploy_status():
     else:
         recommended = "install_railway_cli"
     
+    # Get tunnel adapter status
+    tailscale_status = None
+    cloudflare_status = None
+    try:
+        from intake.deploy.tunnel_adapters import get_tunnel_adapter_service
+        tunnel_svc = get_tunnel_adapter_service()
+        plans = tunnel_svc.get_all_plans()
+        if plans.tailscale:
+            tailscale_status = plans.tailscale.readiness.value
+        if plans.cloudflare:
+            cloudflare_status = plans.cloudflare.readiness.value
+    except Exception:
+        pass
+    
     return DeployReadinessResponse(
         status="dry_run_only",
         railway=railway_status,
@@ -168,6 +216,11 @@ async def get_deploy_status():
         upload_receiver_status=receiver_status,
         upload_receiver_loopback_only=True,
         fallback_storage_configured=False,
+        tunnel_adapters_configured=True,
+        tailscale_funnel_configured=tailscale_status == "installed" or tailscale_status == "ready_for_dry_run",
+        cloudflare_tunnel_configured=cloudflare_status == "installed" or cloudflare_status == "ready_for_dry_run",
+        tunnel_exposure_enabled=False,  # Always false - tunnel activation not implemented
+        tunnel_loopback_only=True,  # Tunnel adapters default to loopback-only
         recommended_next_step=recommended,
         dry_run_only=True
     )
@@ -217,7 +270,7 @@ def get_local_review_service() -> LocalQuoteReviewService:
     """Dependency factory for the local review service."""
     return LocalQuoteReviewService()
 
-@router.get("/quotes/pending", response_model=List[HostedQuoteProjection])
+@router.get("/quotes/pending", response_model=list[HostedQuoteProjection])
 async def get_pending_quotes(
     service: LocalQuoteReviewService = Depends(get_local_review_service)
 ):
