@@ -45,6 +45,18 @@ def test_encrypt_decrypt_roundtrip():
     decrypted = service.decrypt_json(encrypted)
     assert decrypted == payload
 
+def test_encrypt_decrypt_string_roundtrip():
+    """Test that string encryption and decryption work correctly."""
+    test_key = secrets.token_bytes(32)
+    service = CryptoService(encryption_key=test_key)
+
+    text = "This is a secret message"
+    encrypted = service.encrypt_string(text)
+    assert isinstance(encrypted, EncryptedPayload)
+
+    decrypted = service.decrypt_string(encrypted)
+    assert decrypted == text
+
 
 def test_encrypt_decrypt_different_payloads():
     """Test encryption/decryption with multiple different payloads."""

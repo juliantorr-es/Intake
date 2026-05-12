@@ -134,35 +134,20 @@ async def add_location(
 ) -> QuoteStartResponse:
     """Add location information to a quote.
 
-    The exact location is encrypted before storage.
+    The exact location is encrypted before storage using CryptoService.
     """
-    quote = service.get_quote(quote_id)
-    if not quote:
-        raise HTTPException(status_code=404, detail="Quote not found")
-
-    if request.general_service_area is not None:
-        quote.general_service_area = request.general_service_area
-    
-    # If dev-only mock encrypted exact location is provided, we store it
+    # We use the service to handle encryption and storage
+    # If dev_encrypted_exact_location is provided, we extract 'raw' for encryption
+    # This maintains compatibility with the current frontend while securing the data.
+    exact_location = ""
     if request.dev_encrypted_exact_location:
-        from intake.domain.crypto import EncryptedPayload
-        
-        raw_data = request.dev_encrypted_exact_location.get("raw")
-        if raw_data:
-            # DEV-ONLY MOCK ENCRYPTION: Prefixing with 'enc:' is for local development only.
-            # MUST be replaced by CryptoService-backed encryption before production.
-            quote.encrypted_exact_location = EncryptedPayload(
-                ciphertext=f"enc:{raw_data}",
-                nonce="dev-mock-nonce"
-            )
-        else:
-            try:
-                quote.encrypted_exact_location = EncryptedPayload(**request.dev_encrypted_exact_location)
-            except Exception:
-                pass
+        exact_location = request.dev_encrypted_exact_location.get("raw") or ""
 
-    quote.updated_at = utc_now()
-    updated = service._repo.update(quote)
+    updated = service.add_location(
+        quote_id=quote_id,
+        general_service_area=request.general_service_area or "Unknown",
+        exact_location=exact_location,
+    )
 
     if not updated:
         raise HTTPException(status_code=404, detail="Quote not found")

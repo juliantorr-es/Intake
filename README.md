@@ -84,12 +84,14 @@ Intake/
 ├── src/intake/
 │   ├── app.py              # FastAPI application entry
 │   ├── config.py           # Configuration management
-│   ├── api/
-│   │   ├── __init__.py
-│   │   ├── health.py       # Health check endpoint
-│   │   ├── auth_passkeys.py # Passkey authentication endpoints
-│   │   └── quotes.py       # Quote intake endpoints
-│   ├── domain/
+│   ├── hosted/             # Hosted Public Backend module
+│   │   ├── api/            # API routers
+│   │   ├── auth/           # Passkey and account logic
+│   │   ├── quotes/         # Quote intake logic
+│   │   └── uploads/        # Binary upload logic
+│   ├── local_console/      # Local Management Console module
+│   ├── sync/               # Sync protocol models
+│   ├── domain/             # Pure domain models (Pure Python)
 │   │   ├── __init__.py
 │   │   ├── accounts.py     # Account domain models
 │   │   ├── passkeys.py     # Passkey domain models
@@ -152,12 +154,13 @@ This bootstrap uses a single development encryption key from the environment. In
 - Separate encryption keys per tenant/data type
 - Never store private keys in the backend database
 
-#### Local-Dev Mock Encryption
-For the current slice, the **exact location** field uses mock encryption:
-- Payload is accepted as `dev_encrypted_exact_location`.
-- Storage is prefixed with `enc:` for visual verification in logs/DB.
-- This is **plumbing only** and MUST be replaced by `CryptoService`-backed encryption using established library primitives before production use.
-- Sensitive data is never returned in safe summary responses.
+#### CryptoService Integration
+Sensitive quote payloads are encrypted using the project's `CryptoService` (AES-GCM):
+- **Exact Location**: Encrypted at rest.
+- **Access Notes**: Encrypted at rest.
+- **Questionnaire**: Encrypted at rest.
+- **Original Filenames**: Encrypted at rest in upload metadata.
+- Public APIs only return "saved" or "stored" statuses for these fields.
 
 ## Service Lanes
 

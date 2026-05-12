@@ -26,25 +26,29 @@ def test_location_endpoint_empty_body(client, mock_quote_service):
     app.dependency_overrides[get_current_account_id] = lambda: "user-1"
     
     mock_quote = Quote(id="quote-1", account_id="user-1", status=QuoteStatus.DRAFT)
-    mock_quote_service.get_quote.return_value = mock_quote
-    mock_quote_service._repo.update.return_value = mock_quote
+    mock_quote_service.add_location.return_value = mock_quote
     
     # Send minimal valid body according to QuoteLocationRequest
     response = client.post("/api/quotes/quote-1/location", json={"general_service_area": "Test Area"})
     assert response.status_code == 200
     
-    # Send empty body should fail validation if general_service_area is required, 
-    # but we made it optional in our previous edit.
+    # Send empty body should still succeed as fields are optional
     response = client.post("/api/quotes/quote-1/location", json={})
     assert response.status_code == 200
+    
+    # Verify service was called with defaults
+    mock_quote_service.add_location.assert_called_with(
+        quote_id="quote-1",
+        general_service_area="Unknown",
+        exact_location=""
+    )
 
 def test_location_endpoint_dev_encryption(client, mock_quote_service):
     """Test that location endpoint accepts dev_encrypted_exact_location."""
     app.dependency_overrides[get_current_account_id] = lambda: "user-1"
     
     mock_quote = Quote(id="quote-1", account_id="user-1", status=QuoteStatus.DRAFT)
-    mock_quote_service.get_quote.return_value = mock_quote
-    mock_quote_service._repo.update.return_value = mock_quote
+    mock_quote_service.add_location.return_value = mock_quote
     
     payload = {
         "general_service_area": "Test Area",
@@ -53,10 +57,12 @@ def test_location_endpoint_dev_encryption(client, mock_quote_service):
     response = client.post("/api/quotes/quote-1/location", json=payload)
     assert response.status_code == 200
     
-    # Verify mock encryption prefix was used (in the repo update call)
-    update_call_args = mock_quote_service._repo.update.call_args[0][0]
-    assert update_call_args.encrypted_exact_location.ciphertext == "enc:123 Secret St"
-    assert update_call_args.encrypted_exact_location.nonce == "dev-mock-nonce"
+    # Verify service was called with the raw address for encryption
+    mock_quote_service.add_location.assert_called_once_with(
+        quote_id="quote-1",
+        general_service_area="Test Area",
+        exact_location="123 Secret St"
+    )
 
 def test_location_security_privacy(client, mock_quote_service):
     """Test that exact location is NOT returned in public responses."""

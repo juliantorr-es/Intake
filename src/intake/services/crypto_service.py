@@ -117,6 +117,17 @@ class CryptoService:
             key_version=1,
         )
 
+    def encrypt_string(self, text: str) -> EncryptedPayload:
+        """Encrypt a simple string.
+
+        Args:
+            text: String to encrypt
+
+        Returns:
+            EncryptedPayload
+        """
+        return self.encrypt_json({"value": text})
+
     def decrypt_json(self, encrypted: EncryptedPayload) -> dict[str, Any]:
         """Decrypt an encrypted JSON payload.
 
@@ -145,6 +156,18 @@ class CryptoService:
             return json.loads(plaintext.decode())
         except Exception as e:
             raise ValueError(f"Decryption failed: {e}") from e
+
+    def decrypt_string(self, encrypted: EncryptedPayload) -> str:
+        """Decrypt an encrypted string.
+
+        Args:
+            encrypted: EncryptedPayload to decrypt
+
+        Returns:
+            Decrypted string
+        """
+        decrypted = self.decrypt_json(encrypted)
+        return str(decrypted.get("value", ""))
 
 
 @lru_cache()
