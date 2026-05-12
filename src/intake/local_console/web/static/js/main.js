@@ -106,6 +106,14 @@ async function updateStatus() {
         const response = await fetch('/api/local/status');
         const status = await response.json();
         
+        // Update sidebar footer status
+        const sidebarStatusEl = document.getElementById('sidebar-backend-status');
+        if (sidebarStatusEl) {
+            const backendLabel = status.sync_auth_configured ? 'Configured' : 'Not Configured';
+            sidebarStatusEl.className = 'badge ' + (status.sync_auth_configured ? 'success' : 'error');
+            sidebarStatusEl.textContent = 'Backend: ' + backendLabel;
+        }
+        
         document.getElementById('conf-hosted-url').textContent = status.hosted_url;
         
         const syncAuthEl = document.getElementById('conf-sync-auth');
@@ -113,11 +121,11 @@ async function updateStatus() {
         syncAuthEl.className = 'badge ' + (status.sync_auth_configured ? 'success' : 'warning');
         
         const encKeyEl = document.getElementById('conf-enc-key');
-        encKeyEl.textContent = status.encryption_key_configured ? 'Active' : 'Not Set';
+        encKeyEl.textContent = status.encryption_key_configured ? 'Configured' : 'Not Configured';
         encKeyEl.className = 'badge ' + (status.encryption_key_configured ? 'success' : 'warning');
         
         const signKeyEl = document.getElementById('conf-signing-key');
-        signKeyEl.textContent = status.signing_key_configured ? 'Active' : 'Not Set';
+        signKeyEl.textContent = status.signing_key_configured ? 'Configured' : 'Not Configured';
         signKeyEl.className = 'badge ' + (status.signing_key_configured ? 'success' : 'warning');
 
         // Settings Page
@@ -172,10 +180,11 @@ function renderQuotes(quotes) {
         const tr = document.createElement('tr');
         
         const createdDate = quote.created_at ? new Date(quote.created_at).toLocaleDateString() : 'N/A';
+        const isDemo = quote.is_demo || (quote.quote_id && quote.quote_id.startsWith('QT-DEMO'));
         
         tr.innerHTML = `
             <td>
-                <div style="font-weight: 600; font-family: var(--font-mono); font-size: 13px;">${quote.quote_id}</div>
+                <div style="font-weight: 600; font-family: var(--font-mono); font-size: 13px;">${quote.quote_id}${isDemo ? ' <span class="badge private" style="font-size: 10px;" title="Demo UI Only - Not real data">DEMO</span>' : ''}</div>
                 ${quote.email_verified ? '<span style="font-size: 10px; color: var(--state-ok);">✓ Email Verified</span>' : ''}
             </td>
             <td>${getStatusBadge(quote.status)}</td>
@@ -186,7 +195,7 @@ function renderQuotes(quotes) {
             <td style="font-size: 12px; color: var(--color-muted);">${createdDate}</td>
             <td style="font-family: var(--font-mono); font-size: 12px;">${quote.upload_count}</td>
             <td style="text-align: right;">
-                <button class="btn btn-secondary" onclick="showQuoteDetail('${quote.quote_id}')">Review</button>
+                <button class="btn btn-secondary" onclick="showQuoteDetail('${quote.quote_id}')" ${isDemo ? 'disabled title="Demo quote -Review not available for demo data"' : ''}>Review</button>
             </td>
         `;
         
@@ -205,7 +214,8 @@ function seedDemoData() {
             upload_count: 3,
             email_verified: true,
             has_encrypted_payload: true,
-            decrypted: false
+            decrypted: false,
+            is_demo: true
         },
         {
             quote_id: "QT-DEMO-002",
@@ -216,42 +226,58 @@ function seedDemoData() {
             upload_count: 1,
             email_verified: false,
             has_encrypted_payload: true,
-            decrypted: false
+            decrypted: false,
+            is_demo: true
         }
     ];
     quotesData = demoQuotes;
     renderQuotes(demoQuotes);
-    alert('Demo data seeded. (Local UI only, will reset on refresh)');
+    alert('DEMO UI ONLY: Demo data seeded. This is fake data for UI testing only. It will reset on refresh.');
 }
 
 async function showQuoteDetail(quoteId) {
     try {
+        const isDemoQuote = quoteId && quoteId.startsWith('QT-DEMO');
+        
         // First try to find in local seed data
         let detail = quotesData.find(q => q.quote_id === quoteId);
         
         // If not in seed data or we want real data, fetch it
-        if (!detail || !detail.quote_id.startsWith('QT-DEMO')) {
+        if (!detail || !isDemoQuote) {
             const response = await fetch(`/api/local/quotes/${quoteId}/review`);
             detail = await response.json();
         } else {
-            // Mock detail for demo data
+            // Mock detail for demo data - clearly watermarked
             detail = {
                 ...detail,
                 is_locked: true,
-                exact_location: "123 Demo St, San Francisco",
-                access_notes: "Code 1234 on front gate",
+                exact_location: "[DEMO UI ONLY] 123 Demo St, San Francisco",
+                access_notes: "[DEMO UI ONLY] Code 1234 on front gate",
                 questionnaire_answers: { "property_type": "Office", "urgency": "High" },
                 upload_evidence: [
-                    { file_id: "f1", original_filename: "site_photo_1.jpg", size_bytes: 1024000, content_type: "image/jpeg", sha256: "abc", storage_provider: "local" }
-                ]
+                    { file_id: "f1", original_filename: "[DEMO] site_photo_1.jpg", size_bytes: 1024000, content_type: "image/jpeg", sha256: "abc123demo", storage_provider: "[DEMO] local" }
+                ],
+                is_demo: true
             };
         }
         
-        document.getElementById('detail-quote-id').textContent = `Quote ${detail.quote_id}`;
+        document.getElementById('detail-quote-id').textContent = `Quote ${detail.quote_id}${detail.is_demo ? ' [DEMO]' : ''}`;
         document.getElementById('detail-status-badge').innerHTML = getStatusBadge(detail.status);
         document.getElementById('detail-lane').textContent = detail.service_lane || 'GENERAL';
         document.getElementById('detail-area').textContent = detail.general_service_area || 'N/A';
         document.getElementById('detail-email-verified').classList.toggle('hidden', !detail.email_verified);
+        
+        // Show DEMO watermark banner if this is demo data
+        const watermarkEl = document.createElement('div');
+        watermarkEl.style.cssText = 'background: linear-gradient(135deg, #fce8ef, #f3e8ff); border: 1px solid #e9d5ff; border-radius: 6px; padding: 12px; margin-bottom: 16px; text-align: center; font-size: 12px; color: #a855f7; font-weight: 600;';
+        watermarkEl.textContent = '🎭 DEMO UI ONLY - This is fake data for testing purposes. Not real client data.';
+        if (detail.is_demo && !document.getElementById('demo-watermark')) {
+            watermarkEl.id = 'demo-watermark';
+            const header = document.querySelector('.detail-header');
+            if (header) {
+                header.insertBefore(watermarkEl, header.firstChild);
+            }
+        }
         
         // Handle Lock State
         const unlockOverlay = document.getElementById('unlock-required-overlay');
@@ -319,7 +345,12 @@ async function showQuoteDetail(quoteId) {
         
         // Handle "Start Review" button visibility
         const btnStart = document.getElementById('btn-start-review');
-        if (detail.status === 'submitted' || detail.status === 'needs_review') {
+        if (detail.is_demo) {
+            // Disable Start Review for demo quotes
+            if (btnStart) {
+                btnStart.classList.add('hidden');
+            }
+        } else if (detail.status === 'submitted' || detail.status === 'needs_review') {
             btnStart.classList.remove('hidden');
             btnStart.onclick = () => startReview(detail.quote_id);
         } else {

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Intake Local Console - Deployment</title>
     <link rel="stylesheet" href="/static/css/main.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
 </head>
 <body class="native-shell">
     <div class="app-container">
@@ -18,16 +17,25 @@
             </header>
 
             <section class="view">
+                <!-- Honest dry-run labeling -->
+                <div class="panel" style="background: var(--color-bg-subtle); border-color: var(--color-border-subtle); margin-bottom: 16px;">
+                    <h3 style="margin-bottom: 8px;">DRY-RUN MODE ONLY</h3>
+                    <p style="font-size: 13px; color: var(--color-muted); line-height: 1.5;">
+                        <strong>No deployment will be executed.</strong> This console only validates readiness and shows dry-run plans.
+                        To actually deploy, use the hosted Intake service or run commands manually.
+                    </p>
+                </div>
+
                 <div class="panel">
-                    <h3>Host Readiness</h3>
+                    <h3>Deploy Readiness (Dry-Run)</h3>
                     <p class="muted" style="font-size: 13px; margin-bottom: 16px;">
-                        Validation of deployment adapters and host requirements.
+                        Validation of deployment adapters and host requirements. No deployment is performed.
                     </p>
                     
                     <div class="info-list">
                         <div class="info-item">
                             <label>Primary Adapter</label>
-                            <span class="badge info">Railway</span>
+                            <span class="badge info">Railway (Dry-Run)</span>
                         </div>
                         <div class="info-item">
                             <label>CLI Status</label>
@@ -41,18 +49,18 @@
                 </div>
 
                 <div class="panel mt-4">
-                    <h3>Tunnel Adapters</h3>
+                    <h3>Tunnel Adapters (Dry-Run)</h3>
                     <p class="muted" style="font-size: 13px; margin-bottom: 16px;">
-                        Secure exposure for local receiver (Dry-run mode).
+                        Dry-run validation only. No tunnels will be activated.
                     </p>
                     <div class="info-list">
                         <div class="info-item">
                             <label>Tailscale Funnel</label>
-                            <span id="tailscale-status" class="badge info">Not Configured</span>
+                            <span id="tailscale-status" class="badge info">Checking...</span>
                         </div>
                         <div class="info-item">
                             <label>Cloudflare Tunnel</label>
-                            <span id="cloudflare-status" class="badge info">Not Configured</span>
+                            <span id="cloudflare-status" class="badge info">Checking...</span>
                         </div>
                     </div>
                 </div>

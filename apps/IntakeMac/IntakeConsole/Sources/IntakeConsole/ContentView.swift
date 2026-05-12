@@ -1,24 +1,29 @@
 import SwiftUI
 
+// UI Truthfulness: Only show sections that have real implemented surfaces
+// Inbox: Not implemented - removed
+// Deliveries: Actually opens Cost Ledger - renamed to "Cost Ledger"
+// Deploy: Real but dry-run only - kept as "Deploy Readiness"
+// Providers: Shows cost providers - renamed to "Cost Providers"
 enum NavSection: String, CaseIterable, Identifiable {
-    case inbox = "Inbox"
+    case dashboard = "Dashboard"
     case quotes = "Quotes"
     case uploads = "Uploads"
-    case deliveries = "Deliveries"
-    case deploy = "Deploy"
-    case providers = "Providers"
+    case costLedger = "Cost Ledger"
+    case deploy = "Deploy Readiness"
+    case costProviders = "Cost Providers"
     case settings = "Settings"
     
     var id: String { self.rawValue }
     
     var icon: String {
         switch self {
-        case .inbox: return "tray.fill"
+        case .dashboard: return "tray.fill"
         case .quotes: return "doc.text.fill"
         case .uploads: return "arrow.up.doc.fill"
-        case .deliveries: return "shippingbox.fill"
+        case .costLedger: return "dollarsign.circle.fill"
         case .deploy: return "cloud.fill"
-        case .providers: return "externaldrive.connected.to.line.below.fill"
+        case .costProviders: return "externaldrive.connected.to.line.below.fill"
         case .settings: return "gearshape.fill"
         }
     }
@@ -29,7 +34,7 @@ struct ContentView: View {
     @StateObject var launcher: BackendLauncher
     @StateObject var authState = LocalAuthorizationState()
     
-    @State private var selectedSection: NavSection? = .quotes
+    @State private var selectedSection: NavSection? = .dashboard
     @State private var reloadTrigger = 0
     @State private var showInspector = true
     
@@ -38,17 +43,17 @@ struct ContentView: View {
     private var currentURL: URL {
         guard let section = selectedSection else { return backendURL }
         switch section {
-        case .inbox:
+        case .dashboard:
             return backendURL
         case .quotes:
             return backendURL.appendingPathComponent("quotes")
         case .uploads:
             return backendURL.appendingPathComponent("uploads")
-        case .deliveries:
+        case .costLedger:
             return backendURL.appendingPathComponent("costs")
         case .deploy:
             return backendURL.appendingPathComponent("deploy")
-        case .providers:
+        case .costProviders:
             return backendURL.appendingPathComponent("providers")
         case .settings:
             return backendURL.appendingPathComponent("settings")
@@ -239,6 +244,22 @@ struct BackendOfflineView: View {
 }
 
 struct ProofRailView: View {
+    @State private var proofEvents: [ProofEvent] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String? = nil
+    
+    // Timer to refresh proof rail periodically
+    @State private var refreshTimer: Timer?
+    
+    struct ProofEvent: Identifiable {
+        let id: String
+        let title: String
+        let subtitle: String
+        let time: String
+        let icon: String
+        let color: Color
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("PROOF RAIL")
@@ -249,25 +270,145 @@ struct ProofRailView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                    ProofItemView(title: "Local Decrypt", subtitle: "Quote payload verified", time: "NOW", icon: "lock.open.fill", color: IntakeTheme.Colors.stateOk)
-                    ProofItemView(title: "Local Sync", subtitle: "Pulled 3 projections", time: "2m", icon: "arrow.triangle.2.circlepath", color: IntakeTheme.Colors.stateInfo)
-                    ProofItemView(title: "Payload Stored", subtitle: "Encrypted envelope @ Hosted", time: "1h", icon: "tray.and.arrow.down.fill")
-                    ProofItemView(title: "Upload Received", subtitle: "2 files @ Local Receiver", time: "1h", icon: "doc.badge.checkmark", color: IntakeTheme.Colors.stateOk)
-                    ProofItemView(title: "Quote Submitted", subtitle: "Client session completed", time: "1h", icon: "paperplane.fill")
-                    ProofItemView(title: "Email Verified", subtitle: "Client identity confirmed", time: "1h", icon: "checkmark.seal.fill", color: IntakeTheme.Colors.stateOk)
-                    ProofItemView(title: "Passkey Auth", subtitle: "Device registration", time: "2h", icon: "key.fill")
-                    
-                    Divider().padding(.vertical, 8)
-                    
-                    Text("SIGNED ACTIONS")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(IntakeTheme.Colors.muted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    
-                    ProofItemView(title: "Review Started", subtitle: "Action placeholder", time: "---", icon: "signature")
+                    if isLoading {
+                        ProgressView()
+                            .padding(.vertical, 20)
+                    } else if let errorMessage {
+                        Text("Not Available")
+                            .font(.system(size: 12))
+                            .foregroundColor(IntakeTheme.Colors.stateWarn)
+                            .padding(.vertical, 8)
+                        Text(errorMessage)
+                            .font(.system(size: 10))
+                            .foregroundColor(IntakeTheme.Colors.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, 8)
+                    } else if proofEvents.isEmpty {
+                        Text("No proof events yet")
+                            .font(.system(size: 12))
+                            .foregroundColor(IntakeTheme.Colors.muted)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 20)
+                    } else {
+                        ForEach(proofEvents) { event in
+                            ProofItemView(
+                                title: event.title,
+                                subtitle: event.subtitle,
+                                time: event.time,
+                                icon: event.icon,
+                                color: event.color
+                            )
+                        }
+                    }
                 }
                 .padding()
             }
+        }
+        .onAppear {
+            loadProofEvents()
+            // Set up auto-refresh every 30 seconds
+            refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+                loadProofEvents()
+            }
+        }
+        .onDisappear {
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+        }
+    }
+    
+    private func loadProofEvents() {
+        Task {
+            // UI Truthfulness: Only show real proof events from API
+            // If API fails or returns empty, show honest empty state
+            guard let url = URL(string: "http://127.0.0.1:8000/api/local/proof-rail?limit=20") else {
+                isLoading = false
+                errorMessage = "Invalid proof rail URL"
+                return
+            }
+            
+            do {
+                let (data, response) = try await URLSession.shared.data(from: url)
+                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                    if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                        var events: [ProofEvent] = []
+                        for json in jsonArray {
+                            let event = ProofEvent(
+                                id: json["event_id"] as? String ?? UUID().uuidString,
+                                title: json["event_type"] as? String ?? "Unknown",
+                                subtitle: json["details"] as? String ?? json["message"] as? String ?? "",
+                                time: json["created_at"] as? String ?? "",
+                                icon: iconForEvent(json["event_type"] as? String),
+                                color: colorForEvent(json["event_type"] as? String)
+                            )
+                            events.append(event)
+                        }
+                        
+                        if events.isEmpty {
+                            // Still loading - keep showing loading state briefly
+                            // This prevents flash of "not available" during initial load
+                            if !proofEvents.isEmpty {
+                                await MainActor.run {
+                                    self.proofEvents = []
+                                    self.isLoading = false
+                                }
+                            }
+                        } else {
+                            await MainActor.run {
+                                self.proofEvents = events
+                                self.isLoading = false
+                                self.errorMessage = nil
+                            }
+                        }
+                    } else {
+                        await MainActor.run {
+                            self.isLoading = false
+                            // If we got a 200 but no valid JSON, this might be a real empty state
+                            self.proofEvents = []
+                            self.errorMessage = nil
+                        }
+                    }
+                } else {
+                    // API returned non-200 - proof rail might not be configured
+                    await MainActor.run {
+                        self.isLoading = false
+                        self.errorMessage = "Proof rail not configured"
+                    }
+                }
+            } catch {
+                // Network error or API not available - show honest state
+                await MainActor.run {
+                    self.isLoading = false
+                    self.errorMessage = "Proof rail API unavailable"
+                }
+            }
+        }
+    }
+    
+    private func iconForEvent(_ eventType: String?) -> String {
+        switch eventType?.lowercased() {
+        case "quote_created", "quote_submitted": return "doc.fill"
+        case "upload_received", "upload_completed": return "arrow.up.doc.fill"
+        case "decrypt_success", "decryption_complete": return "lock.open.fill"
+        case "sync_pull", "sync_complete": return "arrow.triangle.2.circlepath"
+        case "email_verified": return "checkmark.seal.fill"
+        case "passkey_registration", "passkey_auth": return "key.fill"
+        case "session_started", "session_complete": return "clock.fill"
+        case "cost_scenario_created", "cost_receipt_generated": return "dollarsign.circle.fill"
+        default: return "questionmark.circle.fill"
+        }
+    }
+    
+    private func colorForEvent(_ eventType: String?) -> Color {
+        switch eventType?.lowercased() {
+        case "decrypt_success", "quote_submitted", "upload_completed", "email_verified":
+            return IntakeTheme.Colors.stateOk
+        case "sync_pull", "sync_complete", "passkey_auth":
+            return IntakeTheme.Colors.stateInfo
+        case "session_started":
+            return IntakeTheme.Colors.stateWarn
+        default:
+            return .secondary
         }
     }
 }

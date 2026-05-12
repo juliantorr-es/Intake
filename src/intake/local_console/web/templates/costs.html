@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Intake Local Console - Vendor Cost Ledger</title>
     <link rel="stylesheet" href="/static/css/main.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="app-container">
@@ -384,7 +383,7 @@
                         <td style="font-family: var(--font-mono);">${totalOneTime}</td>
                         <td style="font-size: 12px; color: var(--color-muted);">${formatShortDate(s.created_at)}</td>
                     </tr>
-                `;n            }).join('')
+                `).join('')
         }
 
         // Load receipts

@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Intake Local Console</title>
     <link rel="stylesheet" href="/static/css/main.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
 </head>
 <body class="">
     <div class="app-container">
@@ -29,7 +28,7 @@
             </nav>
             <div class="sidebar-footer">
                 <div class="status-indicator">
-                    <span class="badge success">Hosted: Online</span>
+                    <span id="sidebar-backend-status" class="badge">Checking...</span>
                 </div>
             </div>
         </aside>
@@ -38,8 +37,8 @@
             <header class="top-bar">
                 <h1 id="page-title">Dashboard</h1>
                 <div class="actions">
-                    <button id="btn-sync" class="btn btn-primary">
-                        <span class="icon">↻</span> Sync Now
+                    <button id="btn-sync" class="btn btn-primary" title="Trigger sync pull from hosted (placeholder - may not perform actual sync)">
+                        <span class="icon">↻</span> Sync Pull (Dry-Run)
                     </button>
                 </div>
             </header>
@@ -51,7 +50,7 @@
                         <div class="value" id="stat-pending-count">-</div>
                     </div>
                     <div class="stat-card">
-                        <label>Security Level</label>
+                        <label>Decryption</label>
                         <div class="value"><span class="badge private">Local-only</span></div>
                     </div>
                 </div>
