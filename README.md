@@ -6,6 +6,7 @@ Intake follows a split-brain architecture designed for maximum security and oper
 
 - **Hosted Intake (Public)**: A hosted web backend serving the public website and API. It handles passkey authentication, email verification, quote submission (encrypted shells), and binary uploads. It is designed to be "boring, available, and public."
 - **Local Intake Console (Local)**: A private management app for operators. It connects outbound to the hosted backend, holds the private decryption keys, and manages site content, quote reviews, and service configurations.
+- **Local Upload Receiver**: A loopback-only service for direct client file uploads. Separate from the Local Console, it handles multipart uploads, session management, and local file storage. Currently bound to `127.0.0.1` only.
 - **Intake Sync**: The narrow protocol connecting them via outbound polling/WebSocket clients.
 
 ### Core Boundaries
@@ -94,6 +95,7 @@ Intake/
 │   │   ├── models.py       # Deployment domain models
 │   │   └── registry.py     # Provider registry
 │   ├── local_console/      # Local Management Console module
+│   │   └── receiver/       # Local Upload Receiver (separate from console)
 │   ├── sync/               # Sync protocol models
 │   ├── domain/             # Pure domain models (Pure Python)
 │   │   ├── __init__.py
@@ -507,7 +509,26 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
 - Real S3/R2 API calls
 - tus server implementation for resumable uploads
 - Provider credential storage
-- Local Receiver Handshake Scaffold (next slice)
+
+## ✅ What This Slice DOES Include
+
+- ✅ **Local Upload Receiver v0** - Full implementation with:
+  - Receiver handshake endpoint `/receiver/handshake`
+  - Health check endpoint `/receiver/health`
+  - Upload session creation `/receiver/uploads/session`
+  - Multipart file upload `/receiver/uploads/{session_id}/file`
+  - Session completion `/receiver/uploads/{session_id}/complete`
+  - Local filesystem storage under `.build/intake/local_receiver/uploads/`
+  - SHA256 file verification and receipts
+  - Loopback-only binding (127.0.0.1)
+  - File validation (content type, extension, size, limits)
+  - Route decision integration
+  - Local Console status integration
+
+- ✅ **Documentation**:
+  - [Local Receiver Uploads](docs/architecture/local_receiver_uploads.md)
+
+- ✅ **Tests**: `tests/test_local_receiver.py` - 16+ passing tests
 
 ## What This Slice Intentionally Does NOT Do
 
@@ -524,16 +545,18 @@ See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed pr
 - ❌ Does NOT add SMS
 - ❌ Does NOT add object storage implementation
 - ❌ Does NOT add inbound control channels
+- ❌ Does NOT expose public URLs for receiver
+- ❌ Does NOT implement resumable uploads (tus)
 
 ## Next Recommended Slice
 
-**Local Receiver Handshake Scaffold**: Implement the operational piece that makes "client uploads directly to my computer if available, fallback if not" work.
+**Tunnel Adapter Layer**: Add support for exposing the Local Receiver publicly via tunnels.
 
 This will:
-- Add local upload receiver endpoint `/upload` to Local Console
-- Implement receiver handshake endpoint `GET /receiver/handshake`
-- Add client-side handshake before upload routing decision
-- Support local loopback uploads first
-- Integrate with fallback routing when local is offline
+- Add Tailscale Funnel adapter for HTTPS exposure
+- Add Cloudflare Tunnel adapter for HTTPS exposure
+- Keep receiver loopback-only by default
+- Add configuration for tunnel selection
+- Maintain boundary between public exposure and local-only mode
 
-**Why this is next**: Cloudflare Tunnel supports hostname-to-local-service mappings via `cloudflared`, and it's a strong future custom-domain option. But the first implementation should be local-loopback only before introducing real tunnels.
+**Why this is next**: The Local Receiver is now operational for local-loopback uploads. The next step is to enable public exposure via tunnel adapters so clients can upload directly to your local instance from anywhere.

@@ -1,7 +1,7 @@
 """Local-only API for the Intake Console."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Any, Optional
+from typing import Any, Optional
 from pydantic import BaseModel
 
 from intake.config import get_settings
@@ -9,8 +9,26 @@ from intake.local_console.sync_client import LocalSyncClient
 from intake.local_console.review_service import LocalQuoteReviewService, LocalDecryptedQuoteReview
 from intake.sync.models import HostedQuoteProjection
 from intake.deploy.registry import list_supported_providers
+from intake.local_console.receiver.models import ReceiverAvailabilityStatus
+from intake.local_console.receiver.service import LocalReceiverService
 
 router = APIRouter()
+
+
+# Receiver service singleton
+_receiver_service: Optional[LocalReceiverService] = None
+
+
+def get_receiver_service() -> Optional[LocalReceiverService]:
+    """Get the receiver service instance."""
+    global _receiver_service
+    if _receiver_service is None:
+        try:
+            from intake.local_console.receiver import LocalReceiverService
+            _receiver_service = LocalReceiverService()
+        except Exception:
+            pass
+    return _receiver_service
 
 
 class LocalStatusResponse(BaseModel):
@@ -37,7 +55,9 @@ class DeployReadinessResponse(BaseModel):
     """Deployment readiness status for Local Console."""
     status: str = "dry_run_only"  # "not_configured", "dry_run_only", "ready", "deployed"
     railway: ProviderStatusResponse
-    upload_receiver_configured: bool = False
+    upload_receiver_configured: bool = True  # Local receiver is now configured
+    upload_receiver_status: Optional[str] = "online"
+    upload_receiver_loopback_only: bool = True
     fallback_storage_configured: bool = False
     recommended_next_step: str = "install_railway_cli"
     dry_run_only: bool = True
@@ -127,6 +147,13 @@ async def get_deploy_status():
     """Get deployment provider readiness status."""
     railway_status = _get_railway_status()
     
+    # Get receiver status
+    receiver_svc = get_receiver_service()
+    if receiver_svc:
+        receiver_status = receiver_svc.get_availability().status.value
+    else:
+        receiver_status = "not_configured"
+    
     if railway_status.cli_present and railway_status.ready_status == "fully_ready":
         recommended = "review_and_deploy"
     elif railway_status.cli_present:
@@ -137,11 +164,22 @@ async def get_deploy_status():
     return DeployReadinessResponse(
         status="dry_run_only",
         railway=railway_status,
-        upload_receiver_configured=False,
+        upload_receiver_configured=True,
+        upload_receiver_status=receiver_status,
+        upload_receiver_loopback_only=True,
         fallback_storage_configured=False,
         recommended_next_step=recommended,
         dry_run_only=True
     )
+
+
+@router.get("/receiver/status", response_model=ReceiverAvailabilityStatus)
+async def get_receiver_status():
+    """Get local receiver availability status."""
+    receiver_svc = get_receiver_service()
+    if receiver_svc:
+        return receiver_svc.get_availability()
+    raise HTTPException(status_code=503, detail="Receiver service not configured")
 
 
 @router.get("/deploy/railway/dry-run", response_model=RailwayDryRunPlanResponse)
