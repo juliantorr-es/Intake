@@ -32,9 +32,11 @@ class LocalDecryptedQuoteReview(BaseModel):
     # Discovery metadata
     email_verified: bool = False
     upload_count: int = 0
+    # Decrypt status
     is_decrypted: bool = False
+    is_locked: bool = True
     
-    # Decrypted fields
+    # Decrypted fields (redacted when locked)
     exact_location: str | None = None
     access_notes: str | None = None
     questionnaire_answers: dict[str, Any] | None = None
@@ -49,7 +51,8 @@ class LocalQuoteReviewService:
         self, 
         sync_client: LocalSyncClient | None = None,
         crypto_service: CryptoService | None = None,
-        signing_service: LocalDeviceSigningService | None = None
+        signing_service: LocalDeviceSigningService | None = None,
+        auth_window: Any | None = None
     ):
         settings = get_settings()
         self.client = sync_client or LocalSyncClient()
@@ -59,6 +62,9 @@ class LocalQuoteReviewService:
         sign_key = settings.intake_local_signing_key.get_secret_value() if settings.intake_local_signing_key else None
         self.signer = signing_service or LocalDeviceSigningService(private_key_base64=sign_key)
         self.device_id = "dev-device-1" # In prod this would come from local identity storage
+        
+        from intake.local_console.security.unlock import get_auth_window
+        self.auth_window = auth_window or get_auth_window()
 
     def get_pending_reviews(self) -> List[HostedQuoteProjection]:
         """Get list of quotes pending review from hosted."""
@@ -66,48 +72,60 @@ class LocalQuoteReviewService:
 
     def get_decrypted_review(self, quote_id: str) -> LocalDecryptedQuoteReview:
         """Fetch and decrypt a quote for local review."""
-        # 1. Fetch projection for metadata
+        # 1. Check lock status
+        is_locked = not self.auth_window.is_unlocked
+        
+        # 2. Fetch projection for metadata
         projections = self.client.fetch_pending_projections()
         projection = next((p for p in projections if p.quote_id == quote_id), None)
         
         if not projection:
-            # Fallback if not in pending list (might be already reviewed)
-            # For v0 simplicity, we'll just raise 404 in the API handler
             raise ValueError(f"Quote {quote_id} not found in pending list")
 
-        # 2. Fetch envelope for ciphertext
+        # 3. Fetch envelope for ciphertext
         envelope = self.client.fetch_quote_envelope(quote_id)
         
-        # 3. Decrypt fields
+        # 4. Decrypt fields (only if not locked)
         exact_location = None
-        if envelope.encrypted_exact_location:
-            decrypted = self.crypto.decrypt_json(envelope.encrypted_exact_location)
-            exact_location = decrypted.get("location")
-
         access_notes = None
-        if envelope.encrypted_access_notes:
-            decrypted = self.crypto.decrypt_json(envelope.encrypted_access_notes)
-            access_notes = decrypted.get("notes")
-
         questionnaire = None
-        if envelope.encrypted_questionnaire:
-            questionnaire = self.crypto.decrypt_json(envelope.encrypted_questionnaire)
-
-        # 4. Populate evidence
-        # In a real system, we'd fetch actual file records from the local receiver storage.
-        # For this slice, we'll simulate evidence from the envelope and projection.
         evidence = []
-        for i, enc_name in enumerate(envelope.encrypted_uploads):
-            decrypted_name = self.crypto.decrypt_string(enc_name)
-            evidence.append(UploadEvidence(
-                file_id=f"file-{i}",
-                original_filename=decrypted_name,
-                content_type="image/jpeg", # Placeholder
-                size_bytes=1024 * 500, # Placeholder
-                sha256="sim-sha256-...",
-                storage_provider="local_loopback_dev",
-                stored_at=datetime.now()
-            ))
+        
+        if not is_locked:
+            if envelope.encrypted_exact_location:
+                decrypted = self.crypto.decrypt_json(envelope.encrypted_exact_location)
+                exact_location = decrypted.get("location")
+
+            if envelope.encrypted_access_notes:
+                decrypted = self.crypto.decrypt_json(envelope.encrypted_access_notes)
+                access_notes = decrypted.get("notes")
+
+            if envelope.encrypted_questionnaire:
+                questionnaire = self.crypto.decrypt_json(envelope.encrypted_questionnaire)
+
+            for i, enc_name in enumerate(envelope.encrypted_uploads):
+                decrypted_name = self.crypto.decrypt_string(enc_name)
+                evidence.append(UploadEvidence(
+                    file_id=f"file-{i}",
+                    original_filename=decrypted_name,
+                    content_type="image/jpeg",
+                    size_bytes=1024 * 500,
+                    sha256="sim-sha256-...",
+                    storage_provider="local_loopback_dev",
+                    stored_at=datetime.now()
+                ))
+        else:
+            # Redacted evidence placeholders
+            for i in range(len(envelope.encrypted_uploads)):
+                evidence.append(UploadEvidence(
+                    file_id=f"file-{i}",
+                    original_filename="[LOCKED]",
+                    content_type="image/jpeg",
+                    size_bytes=0,
+                    sha256="locked",
+                    storage_provider="locked",
+                    stored_at=datetime.now()
+                ))
 
         # 5. Create the local-only review model
         return LocalDecryptedQuoteReview(
@@ -117,9 +135,10 @@ class LocalQuoteReviewService:
             general_service_area=projection.general_service_area,
             created_at=projection.created_at,
             updated_at=projection.updated_at,
-            email_verified=True, # Simulation
+            email_verified=True,
             upload_count=projection.upload_count,
-            is_decrypted=True,
+            is_decrypted=not is_locked,
+            is_locked=is_locked,
             exact_location=exact_location,
             access_notes=access_notes,
             questionnaire_answers=questionnaire,
