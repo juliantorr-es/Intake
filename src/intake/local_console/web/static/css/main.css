@@ -246,7 +246,7 @@ pre.decrypted-box {
 }
 
 /* Utilities */
-.hidden { display: none; }
+.hidden { display: none !important; }
 .mt-4 { margin-top: var(--space-4); }
 
 /* Native Shell Overrides */
@@ -256,4 +256,89 @@ body.native-shell .sidebar {
 
 body.native-shell .content-area {
     padding-top: var(--space-4);
+}
+/* Secure Unlock Overlay */
+.unlock-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    border-radius: var(--radius-card);
+}
+
+.unlock-message {
+    text-align: center;
+    padding: var(--space-8);
+}
+
+.unlock-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: var(--space-4);
+}
+
+.panel-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-4);
+}
+
+.panel-header-row h3 {
+    margin-bottom: 0;
+}
+
+.unlock-expiry {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-muted);
+    margin-right: var(--space-3);
+}
+
+.btn-sm {
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+/* Info List */
+.info-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-item.vertical {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.info-item label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.decrypted-box {
+    width: 100%;
+    padding: var(--space-3);
+    background: #f9f9f9;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 13px;
+    margin-top: var(--space-1);
 }

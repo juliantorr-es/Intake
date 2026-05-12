@@ -27,6 +27,9 @@ enum NavSection: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @StateObject var healthClient: BackendHealthClient
     @StateObject var launcher: BackendLauncher
+    @StateObject var authState = LocalAuthorizationState()
+    private let secureUnlockService = SecureUnlockService()
+    
     @State private var selectedSection: NavSection? = .quotes
     @State private var reloadTrigger = 0
     @State private var showInspector = true
@@ -100,6 +103,50 @@ struct ContentView: View {
         .onDisappear {
             healthClient.stopMonitoring()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("RequestSecureUnlock"))) { _ in
+            performSecureUnlock()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("LockSecureSession"))) { _ in
+            performSecureLock()
+        }
+    }
+    
+    private func performSecureUnlock() {
+        secureUnlockService.requestUnlock(reason: "Access decrypted client intake data") { success in
+            if success {
+                authState.markUnlocked()
+                notifyBackendOfUnlock()
+            }
+        }
+    }
+    
+    private func performSecureLock() {
+        authState.lock()
+        notifyBackendOfLock()
+    }
+    
+    private func notifyBackendOfUnlock() {
+        guard let url = URL(string: "\(backendURL.absoluteString)/api/local/security/unlock") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            DispatchQueue.main.async {
+                self.reloadTrigger += 1 // Trigger webview reload to see decrypted data
+            }
+        }.resume()
+    }
+    
+    private func notifyBackendOfLock() {
+        guard let url = URL(string: "\(backendURL.absoluteString)/api/local/security/lock") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        URLSession.shared.dataTask(with: request) { _, _, _ in
+            DispatchQueue.main.async {
+                self.reloadTrigger += 1
+            }
+        }.resume()
     }
 }
 

@@ -121,9 +121,25 @@
                 
                 <div class="grid-detail">
                     <!-- Decrypted Content -->
-                    <div class="panel highlight">
-                        <h3><span class="badge private" style="margin-right: 8px;">Private</span> Decrypted Local-only View</h3>
-                        <div class="info-list">
+                    <div class="panel highlight" id="decrypted-panel">
+                        <div class="panel-header-row">
+                            <h3><span class="badge private" style="margin-right: 8px;">Private</span> Decrypted Local-only View</h3>
+                            <div id="unlock-status-container" class="hidden">
+                                <span class="unlock-expiry">Expires in: <span id="unlock-time">0:00</span></span>
+                                <button id="btn-lock-now" class="btn btn-sm">Lock Now</button>
+                            </div>
+                        </div>
+                        
+                        <div id="unlock-required-overlay" class="unlock-overlay hidden">
+                            <div class="unlock-message">
+                                <span class="unlock-icon">🔒</span>
+                                <h4>Local Secure Unlock Required</h4>
+                                <p>This view contains sensitive local-only data.</p>
+                                <button id="btn-request-unlock" class="btn btn-primary">Unlock with Touch ID</button>
+                            </div>
+                        </div>
+
+                        <div class="info-list" id="decrypted-content">
                             <div class="info-item vertical">
                                 <label>Exact Location</label>
                                 <div class="decrypted-box" id="detail-location">...</div>
@@ -150,6 +166,39 @@
                             <div class="upload-evidence-list" id="detail-upload-evidence">
                                 <!-- Evidence rows injected here -->
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-settings" class="view hidden">
+                <div class="panel">
+                    <h3>Security Settings</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Local Secure Unlock</label>
+                            <span id="settings-unlock-required" class="badge">Checking...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Unlock Timeout (TTL)</label>
+                            <span id="settings-unlock-ttl">...</span>
+                        </div>
+                        <div class="info-item vertical">
+                            <label>Security Note</label>
+                            <p style="font-size: 13px; color: var(--color-muted); margin-top: 4px;">
+                                Local Secure Unlock uses macOS LocalAuthentication (Touch ID/Passcode) to gate access to decrypted quote data.
+                                This is managed by the native Intake shell.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel mt-4">
+                    <h3>Environment</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Workspace Root</label>
+                            <code id="settings-workspace-root" style="font-size: 11px;">...</code>
                         </div>
                     </div>
                 </div>

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     intake_require_verified_email_for_quote_submit: bool = Field(default=True)
     intake_email_code_ttl_seconds: int = Field(default=900)
     intake_email_code_max_attempts: int = Field(default=5)
+    # Local Secure Unlock
+    intake_require_local_unlock_for_decrypt: bool = Field(default=True)
+    intake_local_unlock_ttl_seconds: int = Field(default=120)
 
     @property
     def is_production(self) -> bool:

@@ -23,6 +23,10 @@ async function initApp() {
     });
 
     document.getElementById('btn-sync').addEventListener('click', triggerSync);
+    
+    // Secure Unlock Actions
+    document.getElementById('btn-request-unlock').addEventListener('click', requestSecureUnlock);
+    document.getElementById('btn-lock-now').addEventListener('click', lockSecureSession);
 
     // Initial load
     await updateStatus();
@@ -39,7 +43,8 @@ function showView(viewId) {
     const titles = {
         'view-dashboard': 'Dashboard',
         'view-quotes': 'Pending Quotes',
-        'view-quote-detail': 'Quote Review'
+        'view-quote-detail': 'Quote Review',
+        'view-settings': 'Settings'
     };
     document.getElementById('page-title').textContent = titles[viewId] || 'Console';
 }
@@ -62,6 +67,18 @@ async function updateStatus() {
         const signKeyEl = document.getElementById('conf-signing-key');
         signKeyEl.textContent = status.signing_key_configured ? 'Active' : 'Not Set';
         signKeyEl.className = 'badge ' + (status.signing_key_configured ? 'success' : 'warning');
+
+        // Settings Page
+        const unlockReqEl = document.getElementById('settings-unlock-required');
+        if (unlockReqEl) {
+            unlockReqEl.textContent = status.local_unlock_required ? 'Enabled' : 'Disabled';
+            unlockReqEl.className = 'badge ' + (status.local_unlock_required ? 'success' : 'warning');
+        }
+        
+        const unlockTTLEl = document.getElementById('settings-unlock-ttl');
+        if (unlockTTLEl) {
+            unlockTTLEl.textContent = `${status.local_unlock_ttl} seconds`;
+        }
         
     } catch (err) {
         console.error('Failed to update status:', err);
@@ -81,7 +98,6 @@ async function loadPendingQuotes() {
         quotes.forEach(quote => {
             const tr = document.createElement('tr');
             
-            // Securely create cell contents
             const cells = [
                 quote.quote_id,
                 quote.status,
@@ -125,9 +141,26 @@ async function showQuoteDetail(quoteId) {
         document.getElementById('detail-area').textContent = detail.general_service_area || 'N/A';
         document.getElementById('detail-email-verified').classList.toggle('hidden', !detail.email_verified);
         
-        document.getElementById('detail-location').textContent = detail.exact_location || 'Not provided';
-        document.getElementById('detail-notes').textContent = detail.access_notes || 'No notes';
-        document.getElementById('detail-questionnaire').textContent = JSON.stringify(detail.questionnaire_answers, null, 2);
+        // Handle Lock State
+        const unlockOverlay = document.getElementById('unlock-required-overlay');
+        const unlockStatus = document.getElementById('unlock-status-container');
+        
+        if (detail.is_locked) {
+            unlockOverlay.classList.remove('hidden');
+            unlockStatus.classList.add('hidden');
+            document.getElementById('detail-location').textContent = '••••••••';
+            document.getElementById('detail-notes').textContent = '••••••••';
+            document.getElementById('detail-questionnaire').textContent = '{ "locked": true }';
+        } else {
+            unlockOverlay.classList.add('hidden');
+            unlockStatus.classList.remove('hidden');
+            document.getElementById('detail-location').textContent = detail.exact_location || 'Not provided';
+            document.getElementById('detail-notes').textContent = detail.access_notes || 'No notes';
+            document.getElementById('detail-questionnaire').textContent = JSON.stringify(detail.questionnaire_answers, null, 2);
+            
+            // Start timer
+            startUnlockTimer();
+        }
         
         // Render evidence
         document.getElementById('detail-upload-count').textContent = detail.upload_count;
@@ -170,13 +203,6 @@ async function showQuoteDetail(quoteId) {
                 
                 evidenceContainer.appendChild(row);
             });
-        } else {
-            const empty = document.createElement('div');
-            empty.className = 'info-item';
-            empty.style.color = 'var(--color-muted)';
-            empty.style.fontStyle = 'italic';
-            empty.textContent = 'No upload evidence available';
-            evidenceContainer.appendChild(empty);
         }
         
         // Handle "Start Review" button visibility
@@ -188,35 +214,10 @@ async function showQuoteDetail(quoteId) {
             btnStart.classList.add('hidden');
         }
 
-        // Mock Proof Rail Update (this would ideally trigger a native shell event)
-        console.log('Updating Proof Rail for quote:', quoteId);
-        
         showView('view-quote-detail');
     } catch (err) {
         console.error('Failed to load quote detail:', err);
-        const detailContainer = document.getElementById('view-quote-detail');
-        
-        // Simple error state display
-        const errorPanel = document.createElement('div');
-        errorPanel.className = 'panel';
-        errorPanel.style.borderColor = 'var(--state-error)';
-        
-        const h3 = document.createElement('h3');
-        h3.style.color = 'var(--state-error)';
-        h3.textContent = 'Decryption Failed';
-        
-        const p = document.createElement('p');
-        p.textContent = 'The quote payload could not be decrypted. Ensure your local encryption key is configured correctly.';
-        
-        errorPanel.appendChild(h3);
-        errorPanel.appendChild(p);
-        
-        const evidenceContainer = document.getElementById('detail-upload-evidence');
-        if (evidenceContainer) evidenceContainer.innerHTML = '';
-        
         showView('view-quote-detail');
-        // Prepend error panel
-        detailContainer.insertBefore(errorPanel, detailContainer.querySelector('.panel').nextSibling);
     }
 }
 
@@ -259,4 +260,58 @@ async function triggerSync() {
         btn.disabled = false;
         btn.innerHTML = originalText;
     }
+}
+
+async function requestSecureUnlock() {
+    console.log('JS: Requesting Secure Unlock...');
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.requestSecureUnlock) {
+        window.webkit.messageHandlers.requestSecureUnlock.postMessage(null);
+    } else {
+        // Fallback for browser testing
+        const response = await fetch('/api/local/security/unlock', { method: 'POST' });
+        if (response.ok) {
+            location.reload();
+        }
+    }
+}
+
+async function lockSecureSession() {
+    console.log('JS: Locking Session...');
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.lockSecureSession) {
+        window.webkit.messageHandlers.lockSecureSession.postMessage(null);
+    } else {
+        await fetch('/api/local/security/lock', { method: 'POST' });
+        location.reload();
+    }
+}
+
+let unlockTimer = null;
+async function startUnlockTimer() {
+    if (unlockTimer) clearInterval(unlockTimer);
+    
+    const updateTimer = async () => {
+        try {
+            const response = await fetch('/api/local/security/status');
+            const status = await response.json();
+            
+            if (!status.is_unlocked) {
+                location.reload(); // Re-lock view
+                clearInterval(unlockTimer);
+                return;
+            }
+            
+            const minutes = Math.floor(status.remaining_seconds / 60);
+            const seconds = Math.floor(status.remaining_seconds % 60);
+            const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            const timeEl = document.getElementById('unlock-time');
+            if (timeEl) timeEl.textContent = timeStr;
+            
+        } catch (err) {
+            console.error('Failed to update unlock timer:', err);
+            clearInterval(unlockTimer);
+        }
+    };
+    
+    await updateTimer();
+    unlockTimer = setInterval(updateTimer, 1000);
 }
