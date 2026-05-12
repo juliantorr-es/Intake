@@ -128,7 +128,7 @@ async function updateStatus() {
         signKeyEl.textContent = status.signing_key_configured ? 'Configured' : 'Not Configured';
         signKeyEl.className = 'badge ' + (status.signing_key_configured ? 'success' : 'warning');
 
-        // Settings Page
+        // Settings Page - update unlock status with mode info
         const unlockReqEl = document.getElementById('settings-unlock-required');
         if (unlockReqEl) {
             unlockReqEl.textContent = status.local_unlock_required ? 'Enabled' : 'Disabled';
@@ -140,8 +140,40 @@ async function updateStatus() {
             unlockTTLEl.textContent = `${status.local_unlock_ttl} seconds`;
         }
         
+        // Check and display unlock mode on settings page
+        await updateUnlockModeDisplay();
+        
     } catch (err) {
         console.error('Failed to update status:', err);
+    }
+}
+
+// Update the unlock mode display based on current status
+async function updateUnlockModeDisplay() {
+    try {
+        const response = await fetch('/api/local/security/status');
+        const status = await response.json();
+        
+        const modeEl = document.getElementById('settings-unlock-mode');
+        if (modeEl) {
+            let modeLabel, badgeClass;
+            switch(status.unlock_mode) {
+                case 'native_os_auth':
+                    modeLabel = 'Native OS Auth (Secure)';
+                    badgeClass = 'success';
+                    break;
+                case 'dev_insecure':
+                    modeLabel = 'Development Insecure';
+                    badgeClass = 'error';
+                    break;
+                default:
+                    modeLabel = 'Not Unlocked';
+                    badgeClass = 'private';
+            }
+            modeEl.innerHTML = `<span class="badge ${badgeClass}">${modeLabel}</span>`;
+        }
+    } catch (err) {
+        console.error('Failed to update unlock mode:', err);
     }
 }
 
@@ -405,15 +437,43 @@ async function triggerSync() {
     }
 }
 
+// Track current challenge for unlock flow
+let currentUnlockChallenge = null;
+
 async function requestSecureUnlock() {
     console.log('JS: Requesting Secure Unlock...');
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.requestSecureUnlock) {
+        // Swift WKWebView: Use native bridge for real LocalAuthentication
         window.webkit.messageHandlers.requestSecureUnlock.postMessage(null);
     } else {
-        // Fallback for browser testing
-        const response = await fetch('/api/local/security/unlock', { method: 'POST' });
-        if (response.ok) {
-            location.reload();
+        // pywebview/browser: Try challenge flow first
+        try {
+            const challengeResp = await fetch('/api/local/security/challenge');
+            if (challengeResp.ok) {
+                const challenge = await challengeResp.json();
+                currentUnlockChallenge = challenge.challenge_token;
+                
+                // In pywebview, we would ideally have a native bridge here
+                // For now, check if this is dev insecure mode and alert the user
+                const statusResp = await fetch('/api/local/security/status');
+                const status = await statusResp.json();
+                
+                if (status.requires_native_auth) {
+                    alert('Secure unlock requires native OS authentication (Touch ID, Face ID, or macOS Password).\n\n' +
+                          'This is not available in browser/pywebview mode.\n\n' +
+                          'To use secure unlock, please use the native Swift application.');
+                } else {
+                    // This should not happen if dev insecure mode is disabled
+                    alert('Secure unlock not available in this mode.');
+                }
+            } else {
+                // Challenge endpoint failed
+                alert('Secure unlock challenge endpoint not available.\n\n' +
+                      'This may be a configuration issue.');
+            }
+        } catch (err) {
+            console.error('JS: Failed to get unlock challenge:', err);
+            alert('Failed to initialize secure unlock: ' + err.message);
         }
     }
 }
@@ -425,6 +485,40 @@ async function lockSecureSession() {
     } else {
         await fetch('/api/local/security/lock', { method: 'POST' });
         location.reload();
+    }
+}
+
+// Attempt unlock via challenge flow (for native bridge integration)
+async function attemptUnlockWithChallenge() {
+    // This would be called by native bridge after OS auth succeeds
+    if (!currentUnlockChallenge) {
+        console.log('No active unlock challenge');
+        return null;
+    }
+    
+    try {
+        const response = await fetch('/api/local/security/unlock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                challenge_token: currentUnlockChallenge,
+                unlock_mode: 'native_os_auth'
+            })
+        });
+        
+        if (response.ok) {
+            currentUnlockChallenge = null;
+            return await response.json();
+        } else {
+            const err = await response.json();
+            throw new Error(err.detail || 'Unlock failed');
+        }
+    } catch (err) {
+        console.error('Unlock with challenge failed:', err);
+        currentUnlockChallenge = null;
+        throw err;
     }
 }
 

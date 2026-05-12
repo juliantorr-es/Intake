@@ -195,10 +195,15 @@
                             <label>Unlock Timeout (TTL)</label>
                             <span id="settings-unlock-ttl">...</span>
                         </div>
+                        <div class="info-item">
+                            <label>Unlock Mode</label>
+                            <span id="settings-unlock-mode" class="badge">Not Unlocked</span>
+                        </div>
                         <div class="info-item vertical">
                             <label>Test Authentication</label>
                             <p style="font-size: 12px; color: var(--color-muted); margin-bottom: 8px;">
                                 Trigger a local authentication prompt to verify Secure Unlock is wired correctly.
+                                <strong>Note:</strong> Browser/pywebview mode requires native shell for real OS authentication.
                             </p>
                             <button id="btn-test-unlock" class="btn btn-secondary">Test Local Secure Unlock</button>
                         </div>

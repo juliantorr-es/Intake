@@ -88,7 +88,7 @@ struct ContentView: View {
                 // Proof Rail / Inspector
                 if showInspector {
                     Divider()
-                    ProofRailView()
+                    ProofRailView(backendBaseURL: backendURL)
                         .frame(width: 280)
                         .background(VisualEffectView(material: .sidebar, blendingMode: .behindWindow))
                 }
@@ -248,6 +248,9 @@ struct ProofRailView: View {
     @State private var isLoading = true
     @State private var errorMessage: String? = nil
     
+    // Received from parent to avoid hardcoding
+    let backendBaseURL: URL
+    
     // Timer to refresh proof rail periodically
     @State private var refreshTimer: Timer?
     
@@ -306,10 +309,6 @@ struct ProofRailView: View {
         }
         .onAppear {
             loadProofEvents()
-            // Set up auto-refresh every 30 seconds
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-                loadProofEvents()
-            }
         }
         .onDisappear {
             refreshTimer?.invalidate()
@@ -321,65 +320,60 @@ struct ProofRailView: View {
         Task {
             // UI Truthfulness: Only show real proof events from API
             // If API fails or returns empty, show honest empty state
-            guard let url = URL(string: "http://127.0.0.1:8000/api/local/proof-rail?limit=20") else {
-                isLoading = false
-                errorMessage = "Invalid proof rail URL"
+            // Use the provided backendBaseURL instead of hardcoded URL
+            let proofRailURL = backendBaseURL
+                .appendingPathComponent("api")
+                .appendingPathComponent("local")
+                .appendingPathComponent("proof-rail")
+                .appendingQueryParameters(["limit": "20"])
+            
+            guard let url = proofRailURL else {
+                await MainActor.run {
+                    self.isLoading = false
+                    self.errorMessage = "Invalid proof rail URL"
+                }
                 return
             }
             
             do {
                 let (data, response) = try await URLSession.shared.data(from: url)
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                        var events: [ProofEvent] = []
-                        for json in jsonArray {
-                            let event = ProofEvent(
-                                id: json["event_id"] as? String ?? UUID().uuidString,
-                                title: json["event_type"] as? String ?? "Unknown",
-                                subtitle: json["details"] as? String ?? json["message"] as? String ?? "",
-                                time: json["created_at"] as? String ?? "",
-                                icon: iconForEvent(json["event_type"] as? String),
-                                color: colorForEvent(json["event_type"] as? String)
-                            )
-                            events.append(event)
-                        }
-                        
-                        if events.isEmpty {
-                            // Still loading - keep showing loading state briefly
-                            // This prevents flash of "not available" during initial load
-                            if !proofEvents.isEmpty {
-                                await MainActor.run {
-                                    self.proofEvents = []
-                                    self.isLoading = false
-                                }
+                
+                await MainActor.run {
+                    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                        if let jsonArray = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+                            var events: [ProofEvent] = []
+                            for json in jsonArray {
+                                let event = ProofEvent(
+                                    id: json["event_id"] as? String ?? UUID().uuidString,
+                                    title: json["event_type"] as? String ?? "Unknown",
+                                    subtitle: json["details"] as? String ?? json["message"] as? String ?? "",
+                                    time: json["created_at"] as? String ?? "",
+                                    icon: iconForEvent(json["event_type"] as? String),
+                                    color: colorForEvent(json["event_type"] as? String)
+                                )
+                                events.append(event)
                             }
-                        } else {
-                            await MainActor.run {
-                                self.proofEvents = events
-                                self.isLoading = false
-                                self.errorMessage = nil
-                            }
-                        }
-                    } else {
-                        await MainActor.run {
+                            
+                            self.proofEvents = events
                             self.isLoading = false
+                            self.errorMessage = nil
+                        } else {
                             // If we got a 200 but no valid JSON, this might be a real empty state
                             self.proofEvents = []
+                            self.isLoading = false
                             self.errorMessage = nil
                         }
-                    }
-                } else {
-                    // API returned non-200 - proof rail might not be configured
-                    await MainActor.run {
+                    } else {
+                        // API returned non-200 - proof rail might not be configured
                         self.isLoading = false
-                        self.errorMessage = "Proof rail not configured"
+                        self.errorMessage = "Proof rail not configured (HTTP " + String(describing: (response as? HTTPURLResponse)?.statusCode) + ")"
                     }
                 }
             } catch {
                 // Network error or API not available - show honest state
                 await MainActor.run {
                     self.isLoading = false
-                    self.errorMessage = "Proof rail API unavailable"
+                    self.errorMessage = "Proof rail API unavailable: " + error.localizedDescription
                 }
             }
         }
@@ -410,6 +404,15 @@ struct ProofRailView: View {
         default:
             return .secondary
         }
+    }
+}
+
+// Helper extension for URL query parameters
+extension URL {
+    func appendingQueryParameters(_ parameters: [String: String]) -> URL? {
+        var components = URLComponents(url: self, resolvingAgainstBaseURL: true)
+        components?.queryItems = parameters.map { URLQueryItem(name: $0.key, value: $0.value) }
+        return components?.url
     }
 }
 

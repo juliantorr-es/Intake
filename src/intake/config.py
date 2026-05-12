@@ -72,6 +72,8 @@ class Settings(BaseSettings):
     # Local Secure Unlock
     intake_require_local_unlock_for_decrypt: bool = Field(default=True)
     intake_local_unlock_ttl_seconds: int = Field(default=120)
+    # Dev-only: Enable insecure loopback unlock (NOT for production)
+    intake_enable_insecure_dev_unlock: bool = Field(default=False)
 
     @property
     def is_production(self) -> bool:
