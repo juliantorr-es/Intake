@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     intake_local_unlock_ttl_seconds: int = Field(default=120)
     # Dev-only: Enable insecure loopback unlock (NOT for production)
     intake_enable_insecure_dev_unlock: bool = Field(default=False)
+    # Native capability token for secure unlock proof (injected into native shells only)
+    intake_native_unlock_capability: SecretStr | None = Field(default=None)
 
     @property
     def is_production(self) -> bool:

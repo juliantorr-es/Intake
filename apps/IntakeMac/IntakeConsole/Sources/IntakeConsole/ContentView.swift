@@ -138,13 +138,14 @@ struct ContentView: View {
     
     private func performSecureUnlock() {
         Task {
+            // Step 1: Perform native OS authentication
             let result = await SecureUnlockService.shared.requestUnlock(reason: "Access decrypted client intake data")
             
             await MainActor.run {
                 switch result {
                 case .success:
-                    authState.unlock()
-                    notifyBackendOfUnlock()
+                    // Native auth succeeded - now complete the challenge flow
+                    completeUnlockFlow()
                 case .failed(let reason):
                     authState.setFailed(reason: reason)
                 case .cancelled, .unavailable:
@@ -154,21 +155,50 @@ struct ContentView: View {
         }
     }
     
+    private func completeUnlockFlow() {
+        Task {
+            do {
+                // Step 2: Fetch challenge from backend
+                let challengeToken = try await SecureUnlockService.shared.fetchChallengeToken(
+                    backendURL: backendURL
+                )
+                
+                // Step 3: Complete unlock with challenge + native proof
+                let response = try await SecureUnlockService.shared.completeUnlockWithChallenge(
+                    challengeToken: challengeToken,
+                    backendURL: backendURL
+                )
+                
+                await MainActor.run {
+                    // Check if unlock was successful in the response
+                    if let response = response, 
+                       let isUnlocked = response["is_unlocked"] as? Bool, 
+                       isUnlocked == true {
+                        authState.unlock()
+                        reloadTrigger += 1 // Trigger webview reload to see decrypted data
+                    } else {
+                        authState.setFailed(reason: "Backend unlock failed")
+                    }
+                }
+            } catch UnlockError.missingNativeCapability {
+                await MainActor.run {
+                    authState.setFailed(reason: "Native capability not configured. Use managed backend mode.")
+                }
+            } catch UnlockError.serverError(let statusCode, let message) {
+                await MainActor.run {
+                    authState.setFailed(reason: "Server error: HTTP \(statusCode) - \(message.prefix(100))")
+                }
+            } catch {
+                await MainActor.run {
+                    authState.setFailed(reason: "Unlock Failed: \(error.localizedDescription.prefix(100))")
+                }
+            }
+        }
+    }
+    
     private func performSecureLock() {
         authState.lock()
         notifyBackendOfLock()
-    }
-    
-    private func notifyBackendOfUnlock() {
-        guard let url = URL(string: "\(backendURL.absoluteString)/api/local/security/unlock") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        
-        URLSession.shared.dataTask(with: request) { _, _, _ in
-            DispatchQueue.main.async {
-                self.reloadTrigger += 1 // Trigger webview reload to see decrypted data
-            }
-        }.resume()
     }
     
     private func notifyBackendOfLock() {

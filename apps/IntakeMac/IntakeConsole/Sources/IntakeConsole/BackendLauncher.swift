@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import CryptoKit
 
 @MainActor
 class BackendLauncher: ObservableObject {
@@ -68,6 +69,15 @@ class BackendLauncher: ObservableObject {
         env["PYTHONPATH"] = pythonPath
         env["INTAKE_HEADLESS"] = "1"
         env["INTAKE_LOCAL_PORT"] = "8000"
+        
+        // Generate a native capability token for secure unlock proof
+        // This binds the Swift native shell to the backend process
+        let capabilityToken = generateNativeCapabilityToken()
+        env["INTAKE_NATIVE_UNLOCK_CAPABILITY"] = capabilityToken
+        
+        // Store the capability for use by SecureUnlockService
+        SecureUnlockService.shared.setNativeCapability(capabilityToken)
+        
         process.environment = env
         
         process.currentDirectoryURL = URL(fileURLWithPath: projectRoot)
@@ -134,4 +144,15 @@ class BackendLauncher: ObservableObject {
             }
         }
     }
+}
+
+// MARK: - Native Capability Token Generation
+
+private func generateNativeCapabilityToken() -> String {
+    /// Generate a cryptographically strong random token for native capability proof.
+    /// This token is unique per-process and binds the Swift shell to the backend.
+    /// Uses CryptoKit for secure random generation.
+    var bytes = [UInt8](repeating: 0, count: 32)
+    _ = SecRandomCopyBytes(kSecRandomDefault, 32, &bytes)
+    return bytes.map { String(format: "%02x", $0) }.joined()
 }

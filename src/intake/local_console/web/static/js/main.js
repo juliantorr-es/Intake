@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
+// Global state for capabilities
+let runtimeCapabilities = null;
+
 async function initApp() {
     // Navigation
     const navItems = document.querySelectorAll('.nav-item');
@@ -27,10 +30,11 @@ async function initApp() {
     // Secure Unlock Actions
     document.getElementById('btn-request-unlock').addEventListener('click', requestSecureUnlock);
     document.getElementById('btn-lock-now').addEventListener('click', lockSecureSession);
-
+    
     // Initial load
     await updateStatus();
     await loadPendingQuotes();
+    await updateCapabilities();
     
     // Switch to initial view if provided
     if (typeof INITIAL_VIEW !== 'undefined' && INITIAL_VIEW !== 'dashboard') {
@@ -51,26 +55,34 @@ async function initApp() {
     document.getElementById('btn-test-unlock')?.addEventListener('click', requestSecureUnlock);
     document.getElementById('btn-seed-demo')?.addEventListener('click', seedDemoData);
     
-    // Update labels based on biometry type
-    updateBiometryLabels();
+    // Update labels based on capabilities, not hardcoded biometry type
+    updateUnlockButtonLabels();
 }
 
-function updateBiometryLabels() {
-    const type = window.intakeBiometryType || 'passcode';
-    const labels = {
-        'touchID': 'Touch ID',
-        'faceID': 'Face ID',
-        'opticID': 'Optic ID',
-        'passcode': 'macOS Password',
-        'unavailable': 'Local Authentication'
-    };
-    const label = labels[type] || 'Local Authentication';
+// Update unlock button labels based on capabilities from the backend
+// This replaces hardcoded biometry labels with accurate runtime labels
+async function updateUnlockButtonLabels() {
+    await updateCapabilities();
     
     const unlockBtn = document.getElementById('btn-request-unlock');
-    if (unlockBtn) unlockBtn.textContent = `Unlock with ${label}`;
-    
     const testBtn = document.getElementById('btn-test-unlock');
-    if (testBtn) testBtn.textContent = `Test ${label} Unlock`;
+    
+    if (!unlockBtn) return;
+    
+    // Set button labels from capabilities
+    if (runtimeCapabilities) {
+        unlockBtn.textContent = runtimeCapabilities.unlock_label || 'Request Unlock';
+        if (testBtn) {
+            testBtn.textContent = 'Test ' + (runtimeCapabilities.unlock_label || 'Unlock');
+        }
+        
+        // Add warning if present
+        const warning = runtimeCapabilities.unlock_warning;
+        if (warning) {
+            unlockBtn.title = warning;
+            if (testBtn) testBtn.title = warning;
+        }
+    }
 }
 
 function showView(viewId) {
@@ -99,6 +111,72 @@ function getStatusBadge(status) {
     };
     const cls = classes[status] || 'private';
     return `<span class="badge ${cls}">${status.toUpperCase()}</span>`;
+}
+
+async function updateCapabilities() {
+    """Fetch runtime capabilities from the backend to determine what's available.
+    
+    This endpoint does NOT expose native proof secrets - only safe UI metadata.
+    """
+    try {
+        const response = await fetch('/api/local/security/capabilities');
+        if (response.ok) {
+            runtimeCapabilities = await response.json();
+            console.log('JS: Capabilities:', runtimeCapabilities);
+            
+            // Update unlock button labels based on capabilities
+            updateUnlockButtonLabels();
+            
+            // Update settings page with capabilities info
+            updateCapabilitiesDisplay();
+            
+            // If secure unlock is not available and not dev mode, show message
+            if (!runtimeCapabilities.secure_unlock_available && 
+                !runtimeCapabilities.insecure_dev_unlock_enabled) {
+                // Show that unlock is not available in browser mode
+                updateUnlockModeDisplay();
+            }
+        }
+    } catch (err) {
+        console.error('JS: Failed to fetch capabilities:', err);
+        // Fallback: Assume browser mode without capabilities
+        runtimeCapabilities = {
+            runtime_shell: 'browser',
+            secure_unlock_available: false,
+            insecure_dev_unlock_enabled: false,
+            unlock_label: 'Unlock Not Available',
+            unlock_warning: 'Secure unlock requires native shell support. This mode cannot perform secure unlock.'
+        };
+        updateUnlockButtonLabels();
+    }
+}
+
+function updateCapabilitiesDisplay() {
+    """Update the settings page with capability information."""
+    if (!runtimeCapabilities) return;
+    
+    // Update runtime shell info
+    const shellEl = document.getElementById('settings-runtime-shell');
+    if (shellEl) {
+        shellEl.textContent = runtimeCapabilities.runtime_shell || 'unknown';
+        shellEl.className = 'badge ' + (runtimeCapabilities.secure_unlock_available ? 'success' : 'warning');
+    }
+    
+    // Update secure unlock availability
+    const secureEl = document.getElementById('settings-secure-unlock-available');
+    if (secureEl) {
+        const label = runtimeCapabilities.secure_unlock_available ? 'Yes' : 'No';
+        const cls = runtimeCapabilities.secure_unlock_available ? 'success' : 'private';
+        secureEl.innerHTML = `<span class="badge ${cls}">${label}</span>`;
+    }
+    
+    // Update insecure dev mode
+    const insecureEl = document.getElementById('settings-insecure-dev-enabled');
+    if (insecureEl) {
+        const label = runtimeCapabilities.insecure_dev_unlock_enabled ? 'Yes' : 'No';
+        const cls = runtimeCapabilities.insecure_dev_unlock_enabled ? 'error' : 'success';
+        insecureEl.innerHTML = `<span class="badge ${cls}">${label}</span>`;
+    }
 }
 
 async function updateStatus() {
@@ -227,7 +305,7 @@ function renderQuotes(quotes) {
             <td style="font-size: 12px; color: var(--color-muted);">${createdDate}</td>
             <td style="font-family: var(--font-mono); font-size: 12px;">${quote.upload_count}</td>
             <td style="text-align: right;">
-                <button class="btn btn-secondary" onclick="showQuoteDetail('${quote.quote_id}')" ${isDemo ? 'disabled title="Demo quote -Review not available for demo data"' : ''}>Review</button>
+                <button class="btn btn-secondary" onclick="showQuoteDetail('${quote.quote_id}')" ${isDemo ? 'disabled title="Demo quote - Review not available for demo data"' : ''}>Review</button>
             </td>
         `;
         
@@ -437,43 +515,58 @@ async function triggerSync() {
     }
 }
 
-// Track current challenge for unlock flow
-let currentUnlockChallenge = null;
+// No active challenge tracking needed in JS - Swift handles it natively
+// In Swift WKWebView, requestSecureUnlock triggers the native bridge which handles
+// the full challenge flow. In pywebview/browser, we use capabilities to show
+// appropriate UI.
 
 async function requestSecureUnlock() {
     console.log('JS: Requesting Secure Unlock...');
+    
+    // Refresh capabilities to get current state
+    await updateCapabilities();
+    
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.requestSecureUnlock) {
         // Swift WKWebView: Use native bridge for real LocalAuthentication
+        // Swift handles the full challenge + native proof flow internally
         window.webkit.messageHandlers.requestSecureUnlock.postMessage(null);
     } else {
-        // pywebview/browser: Try challenge flow first
-        try {
-            const challengeResp = await fetch('/api/local/security/challenge');
-            if (challengeResp.ok) {
-                const challenge = await challengeResp.json();
-                currentUnlockChallenge = challenge.challenge_token;
-                
-                // In pywebview, we would ideally have a native bridge here
-                // For now, check if this is dev insecure mode and alert the user
-                const statusResp = await fetch('/api/local/security/status');
-                const status = await statusResp.json();
-                
-                if (status.requires_native_auth) {
-                    alert('Secure unlock requires native OS authentication (Touch ID, Face ID, or macOS Password).\n\n' +
-                          'This is not available in browser/pywebview mode.\n\n' +
-                          'To use secure unlock, please use the native Swift application.');
-                } else {
-                    // This should not happen if dev insecure mode is disabled
-                    alert('Secure unlock not available in this mode.');
+        // pywebview/browser mode
+        // Check capabilities to see what's actually available
+        if (runtimeCapabilities) {
+            if (runtimeCapabilities.insecure_dev_unlock_enabled) {
+                // Dev mode: Allow insecure unlock
+                try {
+                    const response = await fetch('/api/local/security/unlock', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    
+                    if (response.ok) {
+                        location.reload(); // Refresh to show unlocked state
+                    } else {
+                        const err = await response.json();
+                        alert('Dev unlock failed: ' + (err.detail || 'Unknown error'));
+                    }
+                } catch (err) {
+                    console.error('Dev unlock failed:', err);
+                    alert('Dev unlock failed: ' + err.message);
                 }
-            } else {
-                // Challenge endpoint failed
-                alert('Secure unlock challenge endpoint not available.\n\n' +
-                      'This may be a configuration issue.');
+                return;
             }
-        } catch (err) {
-            console.error('JS: Failed to get unlock challenge:', err);
-            alert('Failed to initialize secure unlock: ' + err.message);
+            
+            // Not dev mode and not Swift - secure unlock is unavailable
+            const warning = runtimeCapabilities.unlock_warning || 
+                'Secure unlock requires native OS authentication (Touch ID, Face ID, or macOS Password).\n\n' +
+                'This is not available in browser/pywebview mode.\n\n' +
+                'To use secure unlock, please use the native Swift application.';
+            alert(warning);
+        } else {
+            // Fallback - capabilities not loaded yet
+            alert('Unable to determine unlock availability. Please try again.');
         }
     }
 }
@@ -488,39 +581,16 @@ async function lockSecureSession() {
     }
 }
 
-// Attempt unlock via challenge flow (for native bridge integration)
-async function attemptUnlockWithChallenge() {
-    // This would be called by native bridge after OS auth succeeds
-    if (!currentUnlockChallenge) {
-        console.log('No active unlock challenge');
-        return null;
-    }
-    
-    try {
-        const response = await fetch('/api/local/security/unlock', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                challenge_token: currentUnlockChallenge,
-                unlock_mode: 'native_os_auth'
-            })
-        });
-        
-        if (response.ok) {
-            currentUnlockChallenge = null;
-            return await response.json();
-        } else {
-            const err = await response.json();
-            throw new Error(err.detail || 'Unlock failed');
-        }
-    } catch (err) {
-        console.error('Unlock with challenge failed:', err);
-        currentUnlockChallenge = null;
-        throw err;
-    }
-}
+// REMOVED: attemptUnlockWithChallenge - Swift handles the challenge flow natively
+// now via SecureUnlockService. This function was a security issue as it allowed
+// ordinary page JS to self-declare native_os_auth with just a challenge token.
+// 
+// The new flow:
+// 1. Swift WKWebView receives requestSecureUnlock message
+// 2. Swift performs LAContext native auth
+// 3. Swift fetches challenge from /api/local/security/challenge
+// 4. Swift POSTs to /api/local/security/unlock with challenge_token + native_proof
+// 5. Backend validates BOTH before unlocking
 
 let unlockTimer = null;
 async function startUnlockTimer() {
