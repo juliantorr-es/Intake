@@ -43,12 +43,17 @@ class Session(BaseModel):
     @property
     def is_active(self) -> bool:
         """Check if session is active (not expired, not revoked)."""
-        return self.revoked_at is None and utc_now() < self.expires_at
+        from intake.domain.time import utc_is_before, as_aware_utc
+        if self.revoked_at is not None:
+            return False
+        # Normalize expires_at which may be naive from DB
+        return utc_is_before(utc_now(), as_aware_utc(self.expires_at))
 
     @property
     def is_expired(self) -> bool:
         """Check if session has expired."""
-        return utc_now() >= self.expires_at
+        from intake.domain.time import utc_is_expired, as_aware_utc
+        return utc_is_expired(as_aware_utc(self.expires_at))
 
     @property
     def is_revoked(self) -> bool:

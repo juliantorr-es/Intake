@@ -32,7 +32,7 @@ class PasskeyChallenge(BaseModel):
     """Challenge for passkey registration or authentication."""
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    challenge: str = Field(default_factory=lambda: base64.b64encode(uuid.uuid4().bytes).decode())
+    challenge: str = Field(default_factory=lambda: base64.urlsafe_b64encode(uuid.uuid4().bytes).decode().rstrip('='))
     rp_id: str
     origin: str
     action: ChallengeAction
@@ -48,19 +48,24 @@ class PasskeyChallenge(BaseModel):
     @property
     def is_valid(self) -> bool:
         """Check if the challenge is still valid (not consumed, not expired)."""
+        from intake.domain.time import utc_is_before, utc_now, as_aware_utc
         settings = get_settings()
         expiry_seconds = settings.intake_challenge_expiry
         now = utc_now()
+        # Normalize datetimes which may be naive from DB
+        expires_at_aware = as_aware_utc(self.expires_at)
+        created_at_aware = as_aware_utc(self.created_at)
         return (
             self.status == PasskeyChallengeStatus.PENDING
-            and now < self.expires_at
-            and (now - self.created_at).total_seconds() < expiry_seconds
+            and utc_is_before(now, expires_at_aware)
+            and (now - created_at_aware).total_seconds() < expiry_seconds
         )
 
     @property
     def is_expired(self) -> bool:
         """Check if the challenge has expired."""
-        return utc_now() >= self.expires_at
+        from intake.domain.time import utc_is_expired, as_aware_utc
+        return utc_is_expired(as_aware_utc(self.expires_at))
 
     @property
     def is_consumed(self) -> bool:

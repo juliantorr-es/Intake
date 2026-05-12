@@ -64,49 +64,28 @@ PASSKEY_SESSION_EXPIRY_SECONDS = 300  # 5 minutes
 
 
 def _normalize_credential_data(credential_data: dict[str, Any]) -> dict[str, Any]:
-    """Normalize credential data from frontend camelCase to backend snake_case.
+    """Prepare credential data for webauthn library verification.
     
-    The frontend sends credential data in browser format (camelCase):
-    - rawId -> raw_id
-    - authenticatorData -> authenticator_data (for auth response)
-    - etc.
+    Duo Labs py_webauthn (webauthn) expects browser-shaped WebAuthn JSON.
+    Do NOT rename camelCase keys like rawId, clientDataJSON, attestationObject,
+    authenticatorData, signature, userHandle, clientExtensionResults.
     
-    The webauthn library expects snake_case for some fields.
+    The webauthn library handles these browser-shaped keys internally.
+    We only need to ensure a clean copy and remove any non-JSON-serializable
+    artifacts (like browser function references).
     """
     if not credential_data:
         return credential_data
     
-    # Create a copy to avoid mutating the original
+    # Create a clean copy
     result = dict(credential_data)
     
-    # Convert rawId -> raw_id (both may be present from browser)
-    if 'rawId' in result and 'raw_id' not in result:
-        result['raw_id'] = result.pop('rawId')
-    
-    # Handle response field conversions
-    if 'response' in result:
+    # Deep copy response if present
+    if 'response' in result and isinstance(result['response'], dict):
         response = dict(result['response'])
-        
-        # clientDataJSON stays as-is (webauthn handles it)
-        # attestationObject stays as-is
-        
-        # For authentication responses: authenticatorData, signature, userHandle
-        if 'authenticatorData' in response and 'authenticator_data' not in response:
-            response['authenticator_data'] = response.pop('authenticatorData')
-        if 'signature' in response and 'signature' not in response:
-            # signature stays as-is
-            pass
-        if 'userHandle' in response and 'user_handle' not in response:
-            response['user_handle'] = response.pop('userHandle')
-        
-        # For registration responses: getAuthenticatorData
+        # Remove any non-data fields (e.g., browser function references)
         if 'getAuthenticatorData' in response:
-            # This is a function in the browser, not data
             del response['getAuthenticatorData']
-            # authenticatorData should be in the response from the browser
-        if 'authenticatorData' in response and 'authenticator_data' not in response:
-            response['authenticator_data'] = response.pop('authenticatorData')
-        
         result['response'] = response
     
     return result
@@ -208,11 +187,11 @@ class PasskeyService:
             challenge=stored_challenge.challenge,
             rp={"id": rp_config["id"], "name": rp_config["name"]},
             user={
-                "id": base64.urlsafe_b64encode(user_id).decode(),
+                "id": bytes_to_base64url(user_id),
                 "name": account.id if account else "anonymous",
                 "displayName": "New User" if not account else f"User {account.id[:8]}",
             },
-            pubKeyCredParams=[{"type": "public-key", "alg": -257}],  # ES256 / RSASSA_PKCS1_v1_5_SHA_256
+            pubKeyCredParams=[{"type": "public-key", "alg": -7}, {"type": "public-key", "alg": -257}],  # ES256, RS256
             authenticatorSelection={
                 "requireResidentKey": True,
                 "userVerification": "preferred",
@@ -260,9 +239,16 @@ class PasskeyService:
         # The challenge is embedded in clientDataJSON by the browser
         import json
         try:
-            client_data_parsed = json.loads(client_data) if isinstance(client_data, str) else client_data
-            challenge_value = client_data_parsed.get("challenge", "")
-        except (json.JSONDecodeError, AttributeError):
+            if isinstance(client_data, str) and client_data:
+                # Decode from base64url using WebAuthn helper (handles padding)
+                client_data_bytes = base64url_to_bytes(client_data)
+                client_data_str = client_data_bytes.decode('utf-8')
+                client_data_parsed = json.loads(client_data_str)
+            else:
+                client_data_parsed = client_data if isinstance(client_data, dict) else {}
+            # Ensure challenge is unpadded for lookup
+            challenge_value = client_data_parsed.get("challenge", "").rstrip('=')
+        except (json.JSONDecodeError, AttributeError, ValueError, UnicodeDecodeError):
             challenge_value = ""
 
         # Find the challenge
@@ -283,7 +269,9 @@ class PasskeyService:
                 detail="Challenge already used or expired",
             )
 
-        if utc_now() > challenge_model.expires_at:
+        # Use normalized comparison: challenge_model.expires_at may be naive from DB
+        from intake.domain.time import utc_is_expired
+        if utc_is_expired(challenge_model.expires_at):
             # Mark as expired and reject
             self._challenge_repo.mark_consumed(challenge_model.id)
             raise HTTPException(
@@ -292,7 +280,6 @@ class PasskeyService:
             )
 
         try:
-            # Verify the registration
             verification = verify_registration_response(
                 credential=credential_data,
                 expected_challenge=base64url_to_bytes(challenge_value),
@@ -305,8 +292,10 @@ class PasskeyService:
             raise HTTPException(status_code=400, detail=f"Registration failed: {e}") from e
 
         # Extract credential data from verification
-        attestation = verification.credential
-
+        # In webauthn v2, VerifiedRegistration has direct fields, not a nested .credential
+        # verification IS the result object with direct access to credential fields
+        # See: https://github.com/duo-labs/py_webauthn/blob/main/src/webauthn/__init__.py
+        
         # Create or get account
         # For this bootstrap, we'll create a new account if not provided
         if challenge_model.account_id:
@@ -318,18 +307,40 @@ class PasskeyService:
             account = Account()
             self._account_repo.create(account)
 
-        # Create the credential
+        # Extract WebAuthn metadata from verification result
+        # In webauthn v2, VerifiedRegistration has direct fields, not a nested .credential
+        credential_id_bytes = verification.credential_id
+        credential_public_key_bytes = verification.credential_public_key
+        sign_count = verification.sign_count
+        
+        # Extract transports from the browser's credential response if available
+        transports_raw = credential_data.get("response", {}).get("transports", [])
+        if isinstance(transports_raw, list) and len(transports_raw) > 0:
+            transports = json.dumps(transports_raw)
+        else:
+            transports = json.dumps([])
+        
+        # Get backup metadata from verification
+        # credential_device_type is an enum or string
+        backup_eligible = (
+            str(verification.credential_device_type) == "multi_device"
+            or getattr(verification.credential_device_type, "value", None) == "multi_device"
+        )
+        backup_state = verification.credential_backed_up
+        # device_label comes from authenticatorAttachment in the original payload
+        device_label = credential_data.get("authenticatorAttachment")
+
+        # Create the credential - use WebAuthn helpers for consistent base64url encoding
         credential = PasskeyCredential(
-            credential_id=base64.urlsafe_b64encode(attestation.credential_id).decode(),
-            public_key=base64.urlsafe_b64encode(attestation.public_key).decode(),
-            sign_count=0,
+            credential_id=bytes_to_base64url(credential_id_bytes),
+            public_key=bytes_to_base64url(credential_public_key_bytes),
+            sign_count=sign_count,
             account_id=account.id,
             name=credential_data.get("name"),
-            # Extract WebAuthn metadata
-            transports=json.dumps(getattr(attestation, 'transports', [])),
-            backup_eligible=getattr(attestation, 'backup_eligible', False),
-            backup_state=getattr(attestation, 'backup_state', False),
-            device_label=getattr(attestation, 'device_label', None),
+            transports=transports,
+            backup_eligible=backup_eligible,
+            backup_state=backup_state,
+            device_label=device_label,
         )
 
         # Store the credential
@@ -416,8 +427,9 @@ class PasskeyService:
             allow_credentials_serialized = []
             for cred in allowed_credentials:
                 # Convert PublicKeyCredentialDescriptor to dict
+                # Use bytes_to_base64url for consistent encoding without padding
                 cred_dict = {
-                    "id": base64.urlsafe_b64encode(cred.id).decode(),
+                    "id": bytes_to_base64url(cred.id),
                     "type": cred.type,
                 }
                 if cred.transports:
@@ -471,9 +483,16 @@ class PasskeyService:
         # Extract challenge from credential response
         client_data = credential_data.get("response", {}).get("clientDataJSON", {})
         try:
-            client_data_parsed = json.loads(client_data) if isinstance(client_data, str) else client_data
-            challenge_value = client_data_parsed.get("challenge", "")
-        except (json.JSONDecodeError, AttributeError):
+            if isinstance(client_data, str) and client_data:
+                # Decode from base64url using WebAuthn helper
+                client_data_bytes = base64url_to_bytes(client_data)
+                client_data_str = client_data_bytes.decode('utf-8')
+                client_data_parsed = json.loads(client_data_str)
+            else:
+                client_data_parsed = client_data if isinstance(client_data, dict) else {}
+            # Ensure challenge is unpadded for lookup
+            challenge_value = client_data_parsed.get("challenge", "").rstrip('=')
+        except (json.JSONDecodeError, AttributeError, ValueError, UnicodeDecodeError):
             challenge_value = ""
 
         # Find the challenge
@@ -494,7 +513,9 @@ class PasskeyService:
                 detail="Challenge already used or expired",
             )
 
-        if utc_now() > challenge_model.expires_at:
+        # Use normalized comparison: challenge_model.expires_at may be naive from DB
+        from intake.domain.time import utc_is_expired
+        if utc_is_expired(challenge_model.expires_at):
             # Mark as expired and reject
             self._challenge_repo.mark_consumed(challenge_model.id)
             raise HTTPException(
@@ -524,8 +545,8 @@ class PasskeyService:
             raise HTTPException(status_code=400, detail="Account not found")
 
         try:
-            # Verify the authentication
-            public_key_bytes = base64.urlsafe_b64decode(credential_model.public_key.encode())
+            # Verify the authentication - decode public_key using webauthn helper
+            public_key_bytes = base64url_to_bytes(credential_model.public_key)
 
             verification = verify_authentication_response(
                 credential=credential_data,
@@ -536,9 +557,22 @@ class PasskeyService:
                 credential_current_sign_count=credential_model.sign_count,
             )
 
-            # Update the credential's sign count
+            # Update the credential's sign count and metadata
             new_sign_count = verification.new_sign_count
-            self._passkey_repo.update_after_login(credential_model.id, int(new_sign_count))
+            
+            # Extract backup metadata from verification
+            backup_eligible = (
+                str(verification.credential_device_type) == "multi_device"
+                or getattr(verification.credential_device_type, "value", None) == "multi_device"
+            )
+            backup_state = verification.credential_backed_up
+
+            self._passkey_repo.update_after_login(
+                credential_id=credential_model.credential_id, 
+                new_sign_count=int(new_sign_count),
+                backup_eligible=backup_eligible,
+                backup_state=backup_state,
+            )
 
             # Mark challenge as consumed
             self._challenge_repo.mark_consumed(challenge_model.id)

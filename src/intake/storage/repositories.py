@@ -411,9 +411,13 @@ class PasskeyRepository:
             return credential
 
     def update_after_login(
-        self, credential_id: str, new_sign_count: int
+        self, 
+        credential_id: str, 
+        new_sign_count: int,
+        backup_eligible: bool | None = None,
+        backup_state: bool | None = None,
     ) -> bool:
-        """Update credential after successful login (update sign count and timestamp)."""
+        """Update credential after successful login (update sign count, timestamp, and backup info)."""
         with self._get_session() as session:
             statement = select(PasskeyCredentialModel).where(
                 PasskeyCredentialModel.credential_id == credential_id
@@ -422,6 +426,10 @@ class PasskeyRepository:
             if model and model.revoked_at is None:
                 model.sign_count = new_sign_count
                 model.last_used_at = utc_now()
+                if backup_eligible is not None:
+                    model.backup_eligible = backup_eligible
+                if backup_state is not None:
+                    model.backup_state = backup_state
                 session.commit()
                 return True
             return False
