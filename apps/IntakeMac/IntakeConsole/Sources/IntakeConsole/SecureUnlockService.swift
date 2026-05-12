@@ -1,6 +1,7 @@
 import Foundation
 import LocalAuthentication
 
+@MainActor
 class SecureUnlockService {
     static let shared = SecureUnlockService()
     
@@ -53,6 +54,7 @@ class SecureUnlockService {
 }
 
 /// Scaffold for future Keychain-bound local authority.
+@MainActor
 class KeychainSecretStore {
     static let shared = KeychainSecretStore()
     

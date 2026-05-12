@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake Local Console - Deployment</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="native-shell">
+    <div class="app-container">
+        <main class="content-area">
+            <header class="top-bar">
+                <h1 id="page-title">Deployment Readiness</h1>
+                <div class="actions">
+                    <button class="btn btn-primary" id="btn-refresh-status">Check Readiness</button>
+                </div>
+            </header>
+
+            <section class="view">
+                <div class="panel">
+                    <h3>Host Readiness</h3>
+                    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">
+                        Validation of deployment adapters and host requirements.
+                    </p>
+                    
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Primary Adapter</label>
+                            <span class="badge info">Railway</span>
+                        </div>
+                        <div class="info-item">
+                            <label>CLI Status</label>
+                            <span id="railway-cli" class="badge">Checking...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Project Linked</label>
+                            <span id="railway-linked" class="badge">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel mt-4">
+                    <h3>Tunnel Adapters</h3>
+                    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">
+                        Secure exposure for local receiver (Dry-run mode).
+                    </p>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Tailscale Funnel</label>
+                            <span id="tailscale-status" class="badge info">Not Configured</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Cloudflare Tunnel</label>
+                            <span id="cloudflare-status" class="badge info">Not Configured</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        async function updateDeployStatus() {
+            try {
+                const response = await fetch('/api/local/deploy/status');
+                const status = await response.json();
+                
+                const cliEl = document.getElementById('railway-cli');
+                cliEl.textContent = status.railway.cli_present ? 'Present' : 'Missing';
+                cliEl.className = 'badge ' + (status.railway.cli_present ? 'success' : 'error');
+                
+                const linkedEl = document.getElementById('railway-linked');
+                linkedEl.textContent = status.railway.project_linked ? 'Yes' : 'No';
+                linkedEl.className = 'badge ' + (status.railway.project_linked ? 'success' : 'warning');
+                
+                const tsEl = document.getElementById('tailscale-status');
+                tsEl.textContent = status.tailscale_funnel_configured ? 'Ready' : 'Not Configured';
+                
+                const cfEl = document.getElementById('cloudflare-status');
+                cfEl.textContent = status.cloudflare_tunnel_configured ? 'Ready' : 'Not Configured';
+                
+            } catch (err) {
+                console.error('Failed to update deploy status:', err);
+            }
+        }
+        
+        document.getElementById('btn-refresh-status').addEventListener('click', updateDeployStatus);
+        document.addEventListener('DOMContentLoaded', updateDeployStatus);
+    </script>
+</body>
+</html>

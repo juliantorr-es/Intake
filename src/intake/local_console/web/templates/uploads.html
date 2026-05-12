@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake Local Console - Uploads</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="native-shell">
+    <div class="app-container">
+        <main class="content-area">
+            <header class="top-bar">
+                <h1 id="page-title">Local Uploads</h1>
+                <div class="actions">
+                    <span class="badge info">Receiver Online</span>
+                </div>
+            </header>
+
+            <section class="view">
+                <div class="panel">
+                    <h3>Recent Local Uploads</h3>
+                    <p class="muted" style="font-size: 13px; margin-bottom: 12px;">
+                        Files received by the local Intake Receiver (Loopback only).
+                    </p>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>File ID</th>
+                                <th>Filename</th>
+                                <th>Size</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="uploads-list">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: var(--color-muted); padding: 24px;">
+                                    No local uploads detected.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="panel mt-4">
+                    <h3>Receiver Configuration</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Port</label>
+                            <span>8001</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Mode</label>
+                            <span class="badge private">Loopback-only</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

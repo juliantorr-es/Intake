@@ -8,6 +8,7 @@ enum UnlockResult {
     case unavailable
 }
 
+@MainActor
 class LocalAuthorizationState: ObservableObject {
     @Published var isUnlocked: Bool = false
     @Published var lastError: String?

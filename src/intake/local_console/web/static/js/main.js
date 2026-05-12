@@ -31,6 +31,21 @@ async function initApp() {
     // Initial load
     await updateStatus();
     await loadPendingQuotes();
+    
+    // Switch to initial view if provided
+    if (typeof INITIAL_VIEW !== 'undefined' && INITIAL_VIEW !== 'dashboard') {
+        const targetId = 'view-' + INITIAL_VIEW;
+        if (document.getElementById(targetId)) {
+            showView(targetId);
+            
+            // Update sidebar if visible
+            const navItem = document.getElementById('nav-' + INITIAL_VIEW);
+            if (navItem) {
+                navItems.forEach(nav => nav.classList.remove('active'));
+                navItem.classList.add('active');
+            }
+        }
+    }
 }
 
 function showView(viewId) {

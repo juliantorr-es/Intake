@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 class BackendHealthClient: ObservableObject {
     @Published var status: BackendStatus = .offline
     private let url: URL
@@ -12,7 +13,9 @@ class BackendHealthClient: ObservableObject {
     func startMonitoring() {
         checkHealth()
         timer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            self?.checkHealth()
+            Task { @MainActor in
+                self?.checkHealth()
+            }
         }
     }
     
@@ -25,8 +28,8 @@ class BackendHealthClient: ObservableObject {
         var request = URLRequest(url: url.appendingPathComponent("api/local/health"))
         request.timeoutInterval = 2.0
         
-        URLSession.shared.dataTask(with: request) { [weak self] _, response, error in
-            DispatchQueue.main.async {
+        URLSession.shared.dataTask(with: request) { [weak self] _, response, _ in
+            Task { @MainActor in
                 if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                     self?.status = .online
                 } else {

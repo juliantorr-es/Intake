@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake Local Console - Providers</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="native-shell">
+    <div class="app-container">
+        <main class="content-area">
+            <header class="top-bar">
+                <h1 id="page-title">Service Providers</h1>
+            </header>
+
+            <section class="view">
+                <div class="panel">
+                    <h3>Registered Providers</h3>
+                    <p class="muted" style="font-size: 13px; margin-bottom: 16px;">
+                        Supported vendors and services for Intake orchestration.
+                    </p>
+                    
+                    <div id="providers-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                        <!-- Injected here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script>
+        async function loadProviders() {
+            try {
+                const response = await fetch('/api/local/costs/providers');
+                const data = await response.json();
+                
+                const container = document.getElementById('providers-list');
+                container.innerHTML = data.providers.map(p => `
+                    <div class="panel" style="margin-bottom: 0;">
+                        <div style="font-weight: 600; font-size: 16px; margin-bottom: 4px;">${p.display_name}</div>
+                        <div style="font-size: 12px; color: var(--color-muted); margin-bottom: 8px;">
+                            <code>${p.kind}</code>
+                        </div>
+                        <p style="font-size: 13px; line-height: 1.4;">${p.description}</p>
+                    </div>
+                `).join('');
+                
+            } catch (err) {
+                console.error('Failed to load providers:', err);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', loadProviders);
+    </script>
+</body>
+</html>

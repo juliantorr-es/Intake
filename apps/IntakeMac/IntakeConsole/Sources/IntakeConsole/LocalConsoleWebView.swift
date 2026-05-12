@@ -25,10 +25,23 @@ struct LocalConsoleWebView: NSViewRepresentable {
     }
     
     func updateNSView(_ nsView: WKWebView, context: Context) {
-        if nsView.url == nil {
+        // If the URL has changed (e.g. tab switched), load the new URL
+        if let currentURL = nsView.url {
+            // Check absolute string to handle potential trailing slashes or normalization differences
+            if currentURL.absoluteString != url.absoluteString {
+                let request = URLRequest(url: url)
+                nsView.load(request)
+                return
+            }
+        } else {
+            // No URL loaded yet
             let request = URLRequest(url: url)
             nsView.load(request)
-        } else if context.coordinator.lastReloadTrigger != reloadTrigger {
+            return
+        }
+        
+        // Handle explicit reload trigger
+        if context.coordinator.lastReloadTrigger != reloadTrigger {
             nsView.reload()
             context.coordinator.lastReloadTrigger = reloadTrigger
         }
@@ -38,6 +51,7 @@ struct LocalConsoleWebView: NSViewRepresentable {
         Coordinator(self)
     }
     
+    @MainActor
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: LocalConsoleWebView
         var lastReloadTrigger: Int = 0
@@ -54,7 +68,7 @@ struct LocalConsoleWebView: NSViewRepresentable {
             }
         }
         
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction, decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
             guard let url = navigationAction.request.url else {
                 decisionHandler(.cancel)
                 return

@@ -35,13 +35,43 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "web/templates"))
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Render the main console UI."""
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "view": "dashboard"})
+
+
+@app.get("/quotes", response_class=HTMLResponse)
+async def quotes_view(request: Request):
+    """Render the quotes list view."""
+    return templates.TemplateResponse("index.html", {"request": request, "view": "quotes"})
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_view(request: Request):
+    """Render the settings view."""
+    return templates.TemplateResponse("index.html", {"request": request, "view": "settings"})
 
 
 @app.get("/costs", response_class=HTMLResponse)
 async def costs_view(request: Request):
     """Render the Vendor Cost Ledger UI."""
     return templates.TemplateResponse("costs.html", {"request": request})
+
+
+@app.get("/uploads", response_class=HTMLResponse)
+async def uploads_view(request: Request):
+    """Render the uploads view."""
+    return templates.TemplateResponse("uploads.html", {"request": request})
+
+
+@app.get("/deploy", response_class=HTMLResponse)
+async def deploy_view(request: Request):
+    """Render the deployment readiness view."""
+    return templates.TemplateResponse("deploy.html", {"request": request})
+
+
+@app.get("/providers", response_class=HTMLResponse)
+async def providers_view(request: Request):
+    """Render the providers view."""
+    return templates.TemplateResponse("providers.html", {"request": request})
 
 def run_server(port):
     """Run the local FastAPI server."""
@@ -58,26 +88,31 @@ def main():
         port = find_free_port()
     
     url = f"http://127.0.0.1:{port}"
+    headless = os.environ.get("INTAKE_HEADLESS") == "1"
     
-    # Start server in a background thread
-    server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
-    server_thread.start()
-    
-    print(f"Local Console Server started at {url}")
-    
-    # Create pywebview window
-    webview.create_window(
-        "Intake Local Console",
-        url,
-        width=1024,
-        height=768,
-        min_size=(800, 600)
-    )
-    
-    # Start webview loop (this blocks until window closed)
-    webview.start()
-    
-    print("Local Console closed.")
+    if headless:
+        print(f"Local Console Server started in HEADLESS mode at {url}")
+        run_server(port)
+    else:
+        # Start server in a background thread
+        server_thread = threading.Thread(target=run_server, args=(port,), daemon=True)
+        server_thread.start()
+        
+        print(f"Local Console Server started at {url}")
+        
+        # Create pywebview window
+        webview.create_window(
+            "Intake Local Console",
+            url,
+            width=1024,
+            height=768,
+            min_size=(800, 600)
+        )
+        
+        # Start webview loop (this blocks until window closed)
+        webview.start()
+        
+        print("Local Console closed.")
 
 if __name__ == "__main__":
     main()

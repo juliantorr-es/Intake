@@ -35,6 +35,26 @@ struct ContentView: View {
     
     let backendURL: URL
     
+    private var currentURL: URL {
+        guard let section = selectedSection else { return backendURL }
+        switch section {
+        case .inbox:
+            return backendURL
+        case .quotes:
+            return backendURL.appendingPathComponent("quotes")
+        case .uploads:
+            return backendURL.appendingPathComponent("uploads")
+        case .deliveries:
+            return backendURL.appendingPathComponent("costs")
+        case .deploy:
+            return backendURL.appendingPathComponent("deploy")
+        case .providers:
+            return backendURL.appendingPathComponent("providers")
+        case .settings:
+            return backendURL.appendingPathComponent("settings")
+        }
+    }
+    
     var body: some View {
         NavigationSplitView {
             // Sidebar
@@ -51,8 +71,9 @@ struct ContentView: View {
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
                     if healthClient.status == .online {
-                        LocalConsoleWebView(url: backendURL, reloadTrigger: reloadTrigger)
+                        LocalConsoleWebView(url: currentURL, reloadTrigger: reloadTrigger)
                             .background(IntakeTheme.Colors.paper)
+                            .id(currentURL.absoluteString) // Ensure view re-identity on URL change if needed, though updateNSView handles it
                     } else {
                         BackendOfflineView(healthClient: healthClient, launcher: launcher)
                     }

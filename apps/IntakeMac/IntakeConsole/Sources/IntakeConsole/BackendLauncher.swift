@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+@MainActor
 class BackendLauncher: ObservableObject {
     @Published var isLaunching = false
     @Published var launchError: String?
@@ -12,7 +13,7 @@ class BackendLauncher: ObservableObject {
     }
     
     private let mode: LaunchMode
-    private var process: Process?
+    nonisolated(unsafe) private var process: Process?
     private var cancellables = Set<AnyCancellable>()
     
     init(mode: LaunchMode = .development) {
@@ -35,23 +36,38 @@ class BackendLauncher: ObservableObject {
         isLaunching = true
         launchError = nil
         
-        // Find the project root
-        // In dev, it might be nearby. In prod, it would be in Resources.
-        // For this slice, we assume we are running from the repo.
+        // Find the project root by walking up from current directory
         let fileManager = FileManager.default
-        let currentDir = fileManager.currentDirectoryPath
-        let projectRoot = currentDir // Assuming we are run from the repo root
+        var searchPath = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+        var projectRoot = searchPath.path
+        
+        // Walk up until we find 'src/intake'
+        while searchPath.path != "/" {
+            let srcIntakePath = searchPath.appendingPathComponent("src/intake").path
+            var isDir: ObjCBool = false
+            if fileManager.fileExists(atPath: srcIntakePath, isDirectory: &isDir), isDir.boolValue {
+                projectRoot = searchPath.path
+                break
+            }
+            searchPath = searchPath.deletingLastPathComponent()
+        }
         
         let pythonPath = "\(projectRoot)/src"
         
+        print("BackendLauncher: Current Directory: \(fileManager.currentDirectoryPath)")
+        print("BackendLauncher: Project Root: \(projectRoot)")
+        print("BackendLauncher: PYTHONPATH: \(pythonPath)")
+        
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["python3", "-m", "intake.local_console.app"]
+        // Try to use homebrew python 3.13 as fallback, but prefer 'python3' if it exists in path
+        // For managed mode in dev, we often need a specific path if PATH isn't inherited cleanly
+        process.executableURL = URL(fileURLWithPath: "/opt/homebrew/opt/python@3.13/bin/python3.13")
+        process.arguments = ["-m", "intake.local_console.app"]
         
         var env = ProcessInfo.processInfo.environment
         env["PYTHONPATH"] = pythonPath
         env["INTAKE_HEADLESS"] = "1"
-        env["INTAKE_LOCAL_PORT"] = "8000" // Force port for simplicity in this slice
+        env["INTAKE_LOCAL_PORT"] = "8000"
         process.environment = env
         
         process.currentDirectoryURL = URL(fileURLWithPath: projectRoot)
@@ -67,7 +83,7 @@ class BackendLauncher: ObservableObject {
             
             // Watch for termination
             process.terminationHandler = { [weak self] proc in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self?.isRunning = false
                     self?.isLaunching = false
                     if proc.terminationStatus != 0 {
@@ -80,6 +96,18 @@ class BackendLauncher: ObservableObject {
             // though health client will confirm connectivity.
             self.isRunning = true
             self.isLaunching = false
+            
+            // Read output to diagnose issues
+            let outHandle = pipe.fileHandleForReading
+            outHandle.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
+                if let line = String(data: data, encoding: .utf8) {
+                    // Task used to ensure thread safety for print if needed, 
+                    // though print is thread-safe. Primarily to keep patterns consistent.
+                    print("Backend >>> \(line)", terminator: "")
+                }
+            }
             
         } catch {
             isLaunching = false
@@ -98,6 +126,12 @@ class BackendLauncher: ObservableObject {
     }
     
     deinit {
-        stopBackend()
+        let p = process
+        Task { @MainActor in
+            if let process = p, process.isRunning {
+                process.terminate()
+                print("BackendLauncher: Terminated backend process (from deinit).")
+            }
+        }
     }
 }
