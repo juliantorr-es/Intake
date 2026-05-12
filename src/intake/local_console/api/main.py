@@ -45,9 +45,6 @@ class LocalStatusResponse(BaseModel):
     encryption_key_configured: bool
     signing_key_configured: bool
     is_loopback: bool
-    # Local Secure Unlock
-    local_unlock_required: bool
-    local_unlock_ttl: int
     # Tunnel adapter status
     tunnel_adapter_status: Optional[str] = "not_configured"
     tailscale_funnel_status: Optional[str] = None
@@ -123,8 +120,6 @@ async def get_status():
         encryption_key_configured=bool(settings.intake_dev_encryption_key),
         signing_key_configured=bool(settings.intake_local_signing_key),
         is_loopback=True,  # API should only be reachable via 127.0.0.1
-        local_unlock_required=settings.intake_require_local_unlock_for_decrypt,
-        local_unlock_ttl=settings.intake_local_unlock_ttl_seconds,
         tunnel_adapter_status="active",
         tailscale_funnel_status=tailscale_status,
         cloudflare_tunnel_status=cloudflare_status,
@@ -354,3 +349,13 @@ async def start_quote_review(
 async def trigger_sync_pull():
     """Manually trigger a sync pull (placeholder for now)."""
     return {"status": "success", "message": "Sync pull triggered"}
+@router.get("/deploy/status")
+async def get_deploy_status():
+    """Get status of host bootstrapping and deployment."""
+    providers = list_supported_providers()
+    return {
+        "status": "not_configured",
+        "supported_providers": [p.value for p in providers],
+        "last_deployment": None,
+        "recommended_first_step": "scaffold_railway"
+    }
