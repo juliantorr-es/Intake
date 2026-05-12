@@ -56,7 +56,7 @@ def test_sync_auth_invalid_token(client, configured_settings):
     """Verify that sync endpoints reject invalid tokens."""
     headers = {"X-Intake-Sync-Token": "wrong-token"}
     response = client.get("/api/sync/quotes/pending", headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert "Invalid sync token" in response.json()["detail"]
 
 def test_sync_auth_valid_token(client, configured_settings, mock_quote_service):

@@ -1,7 +1,7 @@
 """Local-only API for the Intake Console."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Any
+from typing import List, Any, Optional
 from pydantic import BaseModel
 
 from intake.config import get_settings
@@ -12,6 +12,7 @@ from intake.deploy.registry import list_supported_providers
 
 router = APIRouter()
 
+
 class LocalStatusResponse(BaseModel):
     """Status of the local console and its connection to hosted."""
     hosted_url: str
@@ -19,6 +20,42 @@ class LocalStatusResponse(BaseModel):
     encryption_key_configured: bool
     signing_key_configured: bool
     is_loopback: bool
+
+
+class ProviderStatusResponse(BaseModel):
+    """Status of a single provider (e.g., Railway)."""
+    provider: str
+    cli_present: bool
+    cli_version: Optional[str] = None
+    authenticated: Optional[bool] = None
+    project_linked: Optional[bool] = None
+    ready_status: str = "not_ready"  # "not_ready", "cli_missing", "ready_for_setup", "fully_ready"
+    blocking_issues: list[str] = []
+
+
+class DeployReadinessResponse(BaseModel):
+    """Deployment readiness status for Local Console."""
+    status: str = "dry_run_only"  # "not_configured", "dry_run_only", "ready", "deployed"
+    railway: ProviderStatusResponse
+    upload_receiver_configured: bool = False
+    fallback_storage_configured: bool = False
+    recommended_next_step: str = "install_railway_cli"
+    dry_run_only: bool = True
+
+
+class RailwayDryRunPlanResponse(BaseModel):
+    """Response containing Railway dry-run plan details."""
+    plan_id: str
+    railway_cli_present: bool
+    railway_cli_version: Optional[str] = None
+    railway_authenticated: Optional[bool] = None
+    railway_project_linked: Optional[bool] = None
+    blocking_issues: list[str] = []
+    warnings: list[str] = []
+    next_manual_steps: list[str] = []
+    # Commands as text only - never executed
+    example_commands: list[str] = []
+
 
 @router.get("/status", response_model=LocalStatusResponse)
 async def get_status():
@@ -33,6 +70,110 @@ async def get_status():
         signing_key_configured=bool(settings.intake_local_signing_key),
         is_loopback=True # API should only be reachable via 127.0.0.1
     )
+
+
+def _get_railway_status() -> ProviderStatusResponse:
+    """Get Railway CLI and project status."""
+    try:
+        # Import here to avoid issues if module is not available
+        from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
+        
+        service = RailwayDryRunBootstrapService()
+        
+        # Check CLI
+        cli = service.check_railway_cli()
+        
+        # Check auth
+        auth = service.check_railway_project()
+        
+        # Build dry-run plan for status
+        plan = service.build_dry_run_plan(include_artifacts=False)
+        
+        if not cli.present:
+            return ProviderStatusResponse(
+                provider="railway",
+                cli_present=False,
+                cli_version=None,
+                authenticated=None,
+                project_linked=None,
+                ready_status="cli_missing",
+                blocking_issues=["Railway CLI not installed"]
+            )
+        
+        is_ready = plan.is_ready if auth.linked else False
+        is_setup_ready = plan.can_attempt_deployment
+        
+        return ProviderStatusResponse(
+            provider="railway",
+            cli_present=True,
+            cli_version=cli.version,
+            authenticated=auth.linked if auth.linked else None,
+            project_linked=auth.linked,
+            ready_status="fully_ready" if is_ready else "ready_for_setup" if is_setup_ready else "not_ready",
+            blocking_issues=plan.blocking_issues
+        )
+    except Exception:
+        # Fallback if there are any issues
+        return ProviderStatusResponse(
+            provider="railway",
+            cli_present=False,
+            ready_status="not_ready",
+            blocking_issues=["Railway check failed"]
+        )
+
+
+@router.get("/deploy/status", response_model=DeployReadinessResponse)
+async def get_deploy_status():
+    """Get deployment provider readiness status."""
+    railway_status = _get_railway_status()
+    
+    if railway_status.cli_present and railway_status.ready_status == "fully_ready":
+        recommended = "review_and_deploy"
+    elif railway_status.cli_present:
+        recommended = "link_project"
+    else:
+        recommended = "install_railway_cli"
+    
+    return DeployReadinessResponse(
+        status="dry_run_only",
+        railway=railway_status,
+        upload_receiver_configured=False,
+        fallback_storage_configured=False,
+        recommended_next_step=recommended,
+        dry_run_only=True
+    )
+
+
+@router.get("/deploy/railway/dry-run", response_model=RailwayDryRunPlanResponse)
+async def get_railway_dry_run_plan():
+    """Generate and return a Railway dry-run plan.
+    
+    This does NOT execute any Railway commands. It only generates
+    a plan showing what would happen.
+    """
+    try:
+        from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
+        
+        service = RailwayDryRunBootstrapService()
+        plan = service.build_dry_run_plan(include_artifacts=False)
+        
+        return RailwayDryRunPlanResponse(
+            plan_id=plan.plan_id,
+            railway_cli_present=plan.railway_cli_present,
+            railway_cli_version=plan.railway_cli_version,
+            railway_authenticated=plan.railway_authenticated,
+            railway_project_linked=plan.railway_project_linked,
+            blocking_issues=plan.blocking_issues,
+            warnings=plan.warnings,
+            next_manual_steps=plan.next_manual_steps,
+            example_commands=plan.commands_that_would_run[:10]  # Limit for response
+        )
+    except Exception as e:
+        return RailwayDryRunPlanResponse(
+            plan_id="error",
+            railway_cli_present=False,
+            warnings=[f"Dry-run plan generation failed: {str(e)}"]
+        )
 
 def get_local_review_service() -> LocalQuoteReviewService:
     """Dependency factory for the local review service."""

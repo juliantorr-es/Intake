@@ -16,6 +16,7 @@ from intake.domain.events import EventAggregateType, EventType
 
 @pytest.fixture
 def client():
+    app.dependency_overrides = {}
     return TestClient(app)
 
 @pytest.fixture

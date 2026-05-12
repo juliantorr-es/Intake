@@ -11,8 +11,13 @@ from intake.deploy.models import (
     DeploymentEnvironmentSpec
 )
 
+
 class RailwayDeploymentAdapter(BaseDeploymentAdapter):
-    """Adapter for Railway.app deployment."""
+    """Adapter for Railway.app deployment.
+    
+    This adapter now integrates with RailwayDryRunBootstrapService for
+    non-mutating readiness checks and dry-run plan generation.
+    """
     
     @property
     def provider(self) -> DeploymentProvider:
@@ -33,7 +38,7 @@ class RailwayDeploymentAdapter(BaseDeploymentAdapter):
             DeploymentEnvironmentSpec(key="INTAKE_LOCAL_SYNC_TOKEN", description="Token for sync protocol authentication", is_secret=True),
             # Forbidden keys
             DeploymentEnvironmentSpec(key="INTAKE_LOCAL_SIGNING_KEY", description="Local private signing key", forbidden=True),
-            DeploymentEnvironmentSpec(key="INTAKE_DEV_ENCRYPTION_KEY", description="Dev symmetric key (risky for prod)", is_secret=True),
+            DeploymentEnvironmentSpec(key="INTAKE_DEV_ENCRYPTION_KEY", description="Dev symmetric key (bootstrap only, risky for prod)", is_secret=True),
         ]
         
         # Filter out forbidden keys if they accidentally leaked into config
@@ -96,10 +101,49 @@ class RailwayDeploymentAdapter(BaseDeploymentAdapter):
         )
         
     def verify_readiness(self) -> dict[str, Any]:
-        # Placeholder for real CLI check
-        return {
-            "cli_installed": False,
-            "authenticated": False,
-            "ready": False,
-            "note": "Railway CLI check not implemented in this slice."
-        }
+        """Verify Railway deployment readiness using dry-run service."""
+        # Import here to avoid circular import
+        try:
+            from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
+            dry_run_service = RailwayDryRunBootstrapService()
+            
+            # Get environment inspection
+            env_info = dry_run_service.inspect_environment()
+            
+            # Build a dry-run plan (without writing artifacts)
+            plan = dry_run_service.build_dry_run_plan(include_artifacts=False)
+            
+            return {
+                "cli_installed": env_info["railway_cli_present"],
+                "cli_version": env_info["railway_cli_version"],
+                "cli_path": env_info["railway_cli_path"],
+                "authenticated": env_info["railway_auth"]["inferred_authenticated"],
+                "project_linked": env_info["railway_project"]["linked"],
+                "ready": plan.can_attempt_deployment,
+                "is_fully_ready": plan.is_ready,
+                "blocking_issues": plan.blocking_issues,
+                "warnings": [
+                    "This is a dry-run check. No Railway resources have been created or modified.",
+                    "To deploy, review the plan and manually execute: railway login, railway link, railway up"
+                ],
+                "note": "Non-mutating Railway dry-run bootstrap check"
+            }
+        except ImportError:
+            # Fallback if dry-run module has issues
+            return {
+                "cli_installed": False,
+                "authenticated": False,
+                "ready": False,
+                "note": "Railway CLI check not fully implemented - fallback to placeholder."
+            }
+        
+    def build_dry_run_plan(self, app_name: str = "intake") -> Any:
+        """Build a comprehensive dry-run plan using the dry-run service.
+        
+        This returns a RailwayDryRunPlan object with full details but
+        does NOT execute any Railway commands.
+        """
+        from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
+        
+        service = RailwayDryRunBootstrapService()
+        return service.build_dry_run_plan(app_name=app_name, include_artifacts=True)

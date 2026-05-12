@@ -122,7 +122,7 @@ class HostedActionVerificationService:
         try:
             public_key.verify(signature_bytes, canonical_bytes)
         except InvalidSignature:
-            raise ValueError("Invalid action signature")
+            return False
             
         # Mark as seen if all checks pass
         self.sync_repo.track_action(envelope.action_id, envelope.device_id, envelope.issued_at)

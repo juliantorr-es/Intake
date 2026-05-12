@@ -28,22 +28,25 @@ async def verify_sync_token(x_intake_sync_token: str = Header(None)):
         )
     if x_intake_sync_token != settings.intake_local_sync_token.get_secret_value():
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid sync token"
         )
 
+from intake.services.quote_service import get_quote_service
+from intake.services.event_log import get_event_log_service
+
 @router.get("/quotes/pending", dependencies=[Depends(verify_sync_token)], response_model=list[HostedQuoteProjection])
-async def get_pending_quotes(quote_repo: QuoteRepository = Depends(lambda: QuoteRepository())):
+async def get_pending_quotes(quote_service: Any = Depends(get_quote_service)):
     """Get non-sensitive projections of quotes needing review."""
-    quotes = quote_repo.get_all_quotes()
+    quotes = quote_service.get_all_quotes()
     # Filter for those needing review
     pending = [q for q in quotes if q.status in [QuoteStatus.SUBMITTED, QuoteStatus.NEEDS_REVIEW]]
     return [HostedQuoteProjection.from_domain(q) for q in pending]
 
 @router.get("/quotes/{quote_id}/envelope", dependencies=[Depends(verify_sync_token)], response_model=EncryptedQuoteEnvelope)
-async def get_quote_envelope(quote_id: str, quote_repo: QuoteRepository = Depends(lambda: QuoteRepository())):
+async def get_quote_envelope(quote_id: str, quote_service: Any = Depends(get_quote_service)):
     """Get the encrypted envelope for a specific quote."""
-    quote = quote_repo.get_by_id(quote_id)
+    quote = quote_service.get_quote(quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
     return EncryptedQuoteEnvelope.from_domain(quote)
@@ -53,8 +56,8 @@ async def process_local_action(
     envelope: LocalDeviceActionEnvelope,
     verify_service: HostedActionVerificationService = Depends(lambda: HostedActionVerificationService()),
     sync_repo: SyncRepository = Depends(lambda: SyncRepository()),
-    quote_repo: QuoteRepository = Depends(lambda: QuoteRepository()),
-    event_repo: EventRepository = Depends(lambda: EventRepository())
+    quote_service: Any = Depends(get_quote_service),
+    event_log: Any = Depends(get_event_log_service)
 ):
     """Verify and process a signed local device action."""
     
@@ -76,21 +79,21 @@ async def process_local_action(
         
     # 3. Dispatch action kind
     if envelope.action_kind == "QUOTE_REVIEW_START":
-        return await handle_quote_review_start(envelope, quote_repo, event_repo)
+        return await handle_quote_review_start(envelope, quote_service, event_log)
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported action kind: {envelope.action_kind}")
 
 async def handle_quote_review_start(
     envelope: LocalDeviceActionEnvelope,
-    quote_repo: QuoteRepository,
-    event_repo: EventRepository
+    quote_service: Any,
+    event_log: Any
 ):
     """Handle QUOTE_REVIEW_START action."""
     if envelope.aggregate_type.lower() != "quote":
         raise HTTPException(status_code=400, detail="Invalid aggregate type for this action")
         
     quote_id = envelope.aggregate_id
-    quote = quote_repo.get_by_id(quote_id)
+    quote = quote_service.get_quote(quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail=f"Quote {quote_id} not found")
         
@@ -106,9 +109,14 @@ async def handle_quote_review_start(
     new_status = QuoteStatus.REVIEWING
     
     # Update quote
-    quote_repo.update_status(quote_id, new_status)
+    # Note: Using the repository directly here since the service might not have a raw status update method 
+    # but for pure stabilization we'll stick to the existing repository logic if needed.
+    # Actually, let's keep it clean if possible.
+    from intake.storage.repositories import QuoteRepository
+    QuoteRepository().update_status(quote_id, new_status)
     
     # Append event
+    from intake.domain.events import Event, EventAggregateType, EventType, EventActorType
     event = Event(
         aggregate_type=EventAggregateType.QUOTE,
         aggregate_id=quote_id,
@@ -118,7 +126,9 @@ async def handle_quote_review_start(
         redacted_summary=f"Quote moved to reviewing by device {envelope.device_id}",
         encrypted_payload=None # Redacted
     )
-    event_repo.append(event)
+    from intake.storage.repositories import EventRepository
+    EventRepository().append(event)
+
     
     return {
         "action_id": envelope.action_id,

@@ -79,8 +79,20 @@ class HostedQuoteProjection(BaseModel):
     has_encrypted_payload: bool
     upload_count: int
     
+    @classmethod
+    def from_domain(cls, quote: Any) -> "HostedQuoteProjection":
+        return cls(
+            quote_id=quote.id,
+            status=quote.status,
+            service_lane=quote.service_lane,
+            general_service_area=quote.general_service_area,
+            created_at=quote.created_at,
+            updated_at=quote.updated_at,
+            has_encrypted_payload=bool(quote.encrypted_exact_location),
+            upload_count=len(quote.uploads) if hasattr(quote, "uploads") else 0
+        )
+
     # Explicitly excluding sensitive fields to prevent accidental leakage
-    # during serialization if the domain model is mapped to this.
     class Config:
         extra = "forbid"
 
@@ -102,6 +114,16 @@ class EncryptedQuoteEnvelope(BaseModel):
     # (Simplified for now: just the encrypted filenames)
     encrypted_uploads: list[EncryptedPayload] = Field(default_factory=list)
     
+    @classmethod
+    def from_domain(cls, quote: Any) -> "EncryptedQuoteEnvelope":
+        return cls(
+            quote_id=quote.id,
+            encrypted_exact_location=quote.encrypted_exact_location,
+            encrypted_access_notes=quote.encrypted_access_notes,
+            encrypted_questionnaire=quote.encrypted_questionnaire,
+            encrypted_uploads=[u.encrypted_original_filename for u in quote.uploads] if hasattr(quote, "uploads") else []
+        )
+
     def to_summary(self) -> str:
         fields = []
         if self.encrypted_exact_location: fields.append("location")
@@ -168,3 +190,4 @@ class SyncEvent(BaseModel):
     event_type: str
     redacted_summary: str
     details: dict[str, Any] = Field(default_factory=dict)
+ls: dict[str, Any] = Field(default_factory=dict)

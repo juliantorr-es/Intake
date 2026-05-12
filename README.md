@@ -349,6 +349,191 @@ Intake includes a **Deployment Adapter Architecture** to help operators provisio
 - **Security First**: Local private keys are NEVER included in deployment artifacts.
 - **Artifact Generation**: Generates `railway.json` and `.env.hosted.example` for manual or CLI-based deployment.
 
+See [Host Bootstrapping](docs/architecture/host-bootstrapping.md) for full details.
+
+### Railway Dry-Run Bootstrap - ✅ IMPLEMENTED
+
+**Status**: This slice is now implemented with full dry-run capability.
+
+The Railway dry-run bootstrap service provides:
+- **CLI Detection**: Checks `railway --version`, `which railway`, `command -v railway`
+- **Auth Detection**: Scans for Railway config files (non-mutating, no API calls)
+- **Project Detection**: Checks for `railway.json` in working directory
+- **Dry-Run Plan Generation**: Returns complete deployment plan as text without executing anything
+- **Artifact Validation**: Validates that no forbidden env vars leak into generated artifacts
+
+**Key Safety Guarantees**:
+- ✅ No Railway API calls (no `railway login status`, no `railway projects`)
+- ✅ No mutating commands executed (`railway init`, `railway link`, `railway up` never run)
+- ✅ Commands returned as text strings only
+- ✅ Local-only env vars (INTAKE_LOCAL_SIGNING_KEY, etc.) NEVER included in deployment plans
+- ✅ Forbidden keys only appear in comments in generated `.env.hosted.example`
+
+**Local Console API Endpoints**:
+- `GET /deploy/status` - Deployment readiness status
+- `GET /deploy/railway/dry-run` - Generate Railway dry-run plan
+
+**Usage**:
+```python
+from intake.deploy.railway_dry_run import RailwayDryRunBootstrapService
+
+service = RailwayDryRunBootstrapService()
+plan = service.build_dry_run_plan(app_name="my-intake")
+
+# Review what would happen without executing
+print(f"CLI present: {plan.railway_cli_present}")
+print(f"Blocking issues: {plan.blocking_issues}")
+print("Commands that would run (text only):")
+for cmd in plan.commands_that_would_run:
+    print(f"  {cmd}")
+```
+
+## Provider Architecture
+
+Intake implements an **open upload/provider architecture** with local-first routing:
+
+### Upload Route Priority
+1. **Local Receiver** (127.0.0.1) - Direct upload, zero latency
+2. **Fallback Provider** - Cloud storage buffer when local is offline
+3. **Quote Without Files** - Submit metadata only when all providers unavailable
+
+### Provider Categories
+
+**Hosted Backend Providers** (for Intake backend hosting):
+- **Railway** - First-class target, full dry-run support implemented
+- Render - Stub adapter
+- Fly.io - Stub adapter
+- Docker VPS - Future
+
+**Upload Receiver Providers** (expose local receiver publicly):
+- **Local Loopback** - Development, implemented
+- Tailscale Funnel - Planned (candidate for secure direct device access)
+- Cloudflare Tunnel - Planned (candidate for custom domain exposure)
+
+**Fallback Storage Providers** (buffer files when local offline):
+- Google Drive - Planned (fallback object provider, NOT canonical database)
+- S3 Compatible - Planned
+- Cloudflare R2 - Planned
+- iCloud CloudKit - Experimental
+
+**Resumable Upload Protocol**:
+- **tus Protocol** - Planned (open standard, HTTP-based, Uppy integration)
+
+See [Provider Architecture](docs/architecture/provider-architecture.md) for full details.
+
+### Why Google Drive is Fallback Only
+
+Google Drive is explicitly a **fallback object/file provider, not the canonical database**:
+- It's object storage, not a structured database
+- Cannot replace PostgreSQL/SQLite for Intake's relational data
+- Drive API has rate limits and pagination
+- Search is limited compared to SQL queries needed for quote management
+- The **hosted backend remains the control plane** for routing, auth, and sync coordination
+- Google Drive would only be used as a dumb file buffer
+
+### Why tus/Uppy for Resumable Uploads
+
+[tus](https://tus.io/) is an open protocol for resumable file uploads:
+- **Resume capability**: If tab closes or network drops, uploads resume
+- **HTTP-based**: Works through proxies, firewalls
+- **Uppy integration**: [Uppy](https://uppy.io/) has first-class tus support
+- **Features**: Automatic retry, parallel uploads, progress tracking, chunked uploads
+- **Fit**: Works perfectly with Intake's "local receiver first, fallback later" model
+
+See [Upload Routing Architecture](docs/architecture/upload-routing.md) for full details.
+
+### Why Tailscale Funnel & Cloudflare Tunnel
+
+**Tailscale Funnel**:
+- Creates public HTTPS endpoint for local service
+- Funnel URLs: `https://<funnel-name>.ts.net`
+- Zero-configuration TLS certificates
+- Built-in authentication options
+- Can expose `127.0.0.1:8000` directly
+- **Strong candidate** for direct device uploads with minimal setup
+
+**Cloudflare Tunnel**:
+- `cloudflared` creates secure tunnels to localhost
+- Supports custom domains (e.g., `upload.yourdomain.com`)
+- Built-in DDoS protection and WAF
+- **Strong candidate** for production custom-domain deployments
+
+## Provider Boundary
+
+The **Provider Boundary** ensures safe interaction with external providers:
+
+- ✅ No direct provider API calls from public routes
+- ✅ No credential exposure in public APIs, logs, or UI
+- ✅ Provider secrets always redacted through multiple passes
+- ✅ Filesystem paths Never exposed in public responses
+- ✅ Explicit separation of hosted-safe vs local-only env vars
+- ✅ Safe failure (provider errors don't crash app or expose secrets)
+- ✅ Full auditability (all interactions logged without secrets)
+
+See [Provider Boundary Proofs](docs/proofs/provider_boundary.md) for detailed proofs.
+
+## Current Status
+
+### ✅ Implemented in This Slice
+- Railway dry-run bootstrap service (`src/intake/deploy/railway_dry_run.py`)
+- Upload provider models (`src/intake/deploy/models_upload.py`)
+  - `UploadProviderKind` enum (9 provider kinds)
+  - `UploadProviderCapability` enum (9 capabilities)
+  - `UploadRouteDecision`, `UploadFallbackPolicy`, `ReceiverHandshakeResult`
+  - `ProviderConfigRedacted`, `ProviderHealthCheck`
+- Provider config redaction utilities (`src/intake/deploy/provider_redaction.py`)
+  - `redact_secret_value()` - Redacts secret-looking values
+  - `redact_dict_keys()` - Redacts sensitive dict keys recursively
+  - `redact_file_paths()` - Redacts filesystem paths
+  - `sanitize_provider_config()` - Full sanitization pipeline
+  - `get_redacted_fields()` - Lists redacted field paths
+- Local Console API endpoints for deployment readiness
+- Updated Railway adapter with dry-run integration
+- Documentation:
+  - [Provider Architecture](docs/architecture/provider-architecture.md)
+  - [Upload Routing Architecture](docs/architecture/upload-routing.md)
+  - [Provider Boundary Proofs](docs/proofs/provider_boundary.md)
+  - [Host Bootstrapping (updated)](docs/architecture/host-bootstrapping.md)
+
+### 📋 Tests Added
+- `tests/test_railway_dry_run.py` - 20+ tests for Railway dry-run behavior
+- `tests/test_provider_routing.py` - 30+ tests for provider models and redaction
+
+### 📋 Future Work (NOT in this slice)
+- Actual `railway up` execution
+- Real Tailscale Funnel integration
+- Real Cloudflare Tunnel integration
+- Real Google Drive API calls
+- Real S3/R2 API calls
+- tus server implementation for resumable uploads
+- Provider credential storage
+- Local Receiver Handshake Scaffold (next slice)
+
+## What This Slice Intentionally Does NOT Do
+
+- ❌ Does NOT run `railway up`
+- ❌ Does NOT run `fly deploy`
+- ❌ Does NOT call Render APIs
+- ❌ Does NOT call any provider APIs
+- ❌ Does NOT create provider projects
+- ❌ Does NOT store provider tokens
+- ❌ Does NOT add real Google Drive OAuth
+- ❌ Does NOT add real Tailscale/Cloudflare commands
+- ❌ Does NOT add payments
+- ❌ Does NOT add calendar integration
+- ❌ Does NOT add SMS
+- ❌ Does NOT add object storage implementation
+- ❌ Does NOT add inbound control channels
+
 ## Next Recommended Slice
 
-**Railway Dry-Run Bootstrap**: Enhance the Local Console to verify the `railway` CLI environment, check authentication status, and produce an executable deployment plan with real configuration placeholders.
+**Local Receiver Handshake Scaffold**: Implement the operational piece that makes "client uploads directly to my computer if available, fallback if not" work.
+
+This will:
+- Add local upload receiver endpoint `/upload` to Local Console
+- Implement receiver handshake endpoint `GET /receiver/handshake`
+- Add client-side handshake before upload routing decision
+- Support local loopback uploads first
+- Integrate with fallback routing when local is offline
+
+**Why this is next**: Cloudflare Tunnel supports hostname-to-local-service mappings via `cloudflared`, and it's a strong future custom-domain option. But the first implementation should be local-loopback only before introducing real tunnels.
