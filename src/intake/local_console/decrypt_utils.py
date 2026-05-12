@@ -1,7 +1,7 @@
 """Decryption utilities for operator console."""
 
 import json
-from typing import Any, tuple
+from typing import Any
 
 from intake.config import get_settings
 from intake.domain.crypto import EncryptedPayload

@@ -433,3 +433,71 @@ class EventModel(SQLModel, table=True):
             redacted_summary=self.redacted_summary,
             encrypted_payload=json.dumps(encrypted_payload.model_dump()) if encrypted_payload else None,
         )
+# ========== Sync / Device Models ==========
+
+
+class RegisteredDeviceModel(SQLModel, table=True):
+    """Registered local device on the hosted backend."""
+
+    __tablename__ = "registered_devices"
+
+    device_id: str = Field(primary_key=True, index=True)
+    display_name: str = Field()
+    public_signing_key: str | None = Field(default=None, sa_column=Column(TEXT))
+    public_encryption_key: str | None = Field(default=None, sa_column=Column(TEXT))
+    registered_at: datetime = Field(default_factory=utc_now)
+    last_seen_at: datetime = Field(default_factory=utc_now)
+    revoked_at: datetime | None = Field(default=None, index=True)
+    trust_state: str = Field(default="pending", index=True)
+
+    @classmethod
+    def from_domain(cls, device: Any) -> "RegisteredDeviceModel":
+        """Create a database model from a domain registered device."""
+        registered_at = getattr(device, "registered_at", getattr(device, "created_at", utc_now()))
+        return cls(
+            device_id=device.device_id,
+            display_name=device.display_name,
+            public_signing_key=device.public_signing_key,
+            public_encryption_key=device.public_encryption_key,
+            registered_at=registered_at,
+            last_seen_at=device.last_seen_at,
+            revoked_at=device.revoked_at,
+            trust_state=device.trust_state,
+        )
+
+    def to_domain(self) -> Any:
+        """Convert to domain model."""
+        from intake.sync.models import HostedRegisteredDevice
+
+        return HostedRegisteredDevice(
+            device_id=self.device_id,
+            display_name=self.display_name,
+            public_signing_key=self.public_signing_key,
+            public_encryption_key=self.public_encryption_key,
+            registered_at=self.registered_at,
+            last_seen_at=self.last_seen_at,
+            revoked_at=self.revoked_at,
+            trust_state=self.trust_state,
+        )
+
+
+class TrackedActionModel(SQLModel, table=True):
+    """Tracked action IDs for replay prevention."""
+
+    __tablename__ = "tracked_actions"
+
+    action_id: str = Field(primary_key=True)
+    device_id: str = Field(index=True)
+    issued_at: datetime = Field(index=True)
+    received_at: datetime = Field(default_factory=utc_now)
+
+
+class TrackedNonceModel(SQLModel, table=True):
+    """Tracked nonces per device for replay prevention."""
+
+    __tablename__ = "tracked_nonces"
+
+    device_id: str = Field(primary_key=True)
+    nonce: str = Field(primary_key=True)
+    issued_at: datetime = Field(index=True)
+    received_at: datetime = Field(default_factory=utc_now)

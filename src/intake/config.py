@@ -44,6 +44,17 @@ class Settings(BaseSettings):
         default=None
     )
 
+    # Temporary local-dev sync token for operator sync auth
+    # This is NOT the final operator-device auth model.
+    intake_local_sync_token: SecretStr | None = Field(
+        default=None
+    )
+    # Private signing key for the local device (Base64 Ed25519)
+    intake_local_signing_key: SecretStr | None = Field(
+        default=None
+    )
+    intake_enable_dev_sync_auth: bool = Field(default=True)
+
     # Session cookie configuration
     intake_session_cookie_name: str = Field(default="intake_session")
     intake_session_cookie_secure: bool | None = Field(default=None)

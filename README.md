@@ -307,10 +307,37 @@ INTAKE_SESSION_COOKIE_SECURE=true
 - No passkey backup/recovery flow
 - RP ID must be a domain string (use `localhost` for dev)
 
+## Local Intake Console
+
+The Local Intake Console is a native-looking application (powered by `pywebview`) for operators to review and decrypt client data locally.
+
+### Running the Console
+
+1. **Install dependencies**:
+   ```bash
+   pip install -e ".[console]"
+   ```
+
+2. **Run the console**:
+   ```bash
+   export PYTHONPATH=$PYTHONPATH:$(pwd)/src
+   python -m intake.local_console.app
+   ```
+
+3. **Diagnostic CLI** (Legacy/Development only):
+   ```bash
+   python -m intake.local_console.dev_cli --help
+   ```
+
+## Hosted/Local Boundary
+
+Intake enforces a strict data boundary:
+- **Hosted Backend**: Serves public requests, stores ciphertext, lacks decryption authority.
+- **Local Console**: Pulls data outbound, decrypts locally using private keys.
+- **Sync Protocol**: Secure outbound polling mechanism for data projection.
+
+See [Hosted/Local Boundary](docs/architecture/hosted-local-boundary.md) for full architecture details.
+
 ## Next Recommended Slice
 
-**Binary upload handling**: Secure upload of client-provided files with:
-- Size limits and content type validation
-- Server-side storage or object storage integration
-- Encryption of uploaded files at rest
-- Cleanup of expired/unreferenced uploads
+**Local Console Writeback Actions**: Allow operators to transition quote statuses (e.g., to `reviewing` or `quoted`) directly from the Local Console, with actions being signed and pushed back to the Hosted backend.

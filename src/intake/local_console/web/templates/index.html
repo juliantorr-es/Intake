@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake Local Console</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">▲</span>
+                <span class="logo-text">INTAKE</span>
+            </div>
+            <nav class="main-nav">
+                <a href="#" class="nav-item active" id="nav-dashboard">
+                    <span class="icon">▤</span> Dashboard
+                </a>
+                <a href="#" class="nav-item" id="nav-quotes">
+                    <span class="icon">⚓</span> Pending Quotes
+                </a>
+                <a href="#" class="nav-item" id="nav-settings">
+                    <span class="icon">⚙</span> Settings
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="dot pulse"></span>
+                    <span class="status-text">Hosted: Connected</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="content-area">
+            <header class="top-bar">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="actions">
+                    <button id="btn-sync" class="btn btn-primary">
+                        <span class="icon">↻</span> Sync Now
+                    </button>
+                </div>
+            </header>
+
+            <section id="view-dashboard" class="view">
+                <div class="grid-stats">
+                    <div class="stat-card">
+                        <label>Pending Quotes</label>
+                        <div class="value" id="stat-pending-count">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <label>Security Level</label>
+                        <div class="value text-warning">Dev/Symmetric</div>
+                    </div>
+                </div>
+                
+                <div class="card mt-4">
+                    <h3>Connection State</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Hosted URL</label>
+                            <span id="conf-hosted-url">...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Sync Auth</label>
+                            <span id="conf-sync-auth" class="badge">Checking...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Encryption Key</label>
+                            <span id="conf-enc-key" class="badge">Checking...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Signing Key</label>
+                            <span id="conf-signing-key" class="badge">Checking...</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="view-quotes" class="view hidden">
+                <div class="quote-list-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Status</th>
+                                <th>Area</th>
+                                <th>Uploads</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="quote-list-body">
+                            <!-- Rows will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="view-quote-detail" class="view hidden">
+                <button class="btn-back" id="btn-back-to-list">← Back to List</button>
+                <div class="detail-header">
+                    <h2 id="detail-quote-id">Quote Details</h2>
+                    <div class="header-actions">
+                        <span class="badge" id="detail-status">...</span>
+                        <button id="btn-start-review" class="btn btn-primary hidden">Start Review</button>
+                    </div>
+                </div>
+                
+                <div class="grid-detail">
+                    <div class="card">
+                        <h3>Safe Metadata</h3>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <label>Service Lane</label>
+                                <span id="detail-lane">...</span>
+                            </div>
+                            <div class="info-item">
+                                <label>Area</label>
+                                <span id="detail-area">...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card highlight">
+                        <h3>Decrypted Sensitive Data</h3>
+                        <div class="info-list">
+                            <div class="info-item vertical">
+                                <label>Exact Location</label>
+                                <div class="decrypted-box" id="detail-location">...</div>
+                            </div>
+                            <div class="info-item vertical">
+                                <label>Access Notes</label>
+                                <div class="decrypted-box" id="detail-notes">...</div>
+                            </div>
+                            <div class="info-item vertical">
+                                <label>Questionnaire</label>
+                                <pre class="decrypted-box" id="detail-questionnaire">...</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

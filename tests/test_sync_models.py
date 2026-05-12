@@ -34,16 +34,21 @@ def test_quote_projection_serialization():
 
 def test_encrypted_envelope_serialization():
     """Test that encrypted envelopes hold ciphertext securely."""
-    envelope = EncryptedQuoteEnvelope(
-        quote_id="quote-123",
+    from intake.domain.crypto import EncryptedPayload
+    
+    payload = EncryptedPayload(
         ciphertext="SGVsbG8gV29ybGQ=", # Base64 "Hello World"
         nonce="nonce-123",
         tag="tag-123"
     )
+    envelope = EncryptedQuoteEnvelope(
+        quote_id="quote-123",
+        encrypted_exact_location=payload
+    )
     
     data = envelope.model_dump()
-    assert data["ciphertext"] == "SGVsbG8gV29ybGQ="
-    assert "tag" in data
+    assert data["encrypted_exact_location"]["ciphertext"] == "SGVsbG8gV29ybGQ="
+    assert data["encrypted_exact_location"]["tag"] == "tag-123"
 
 
 def test_operator_action_serialization():

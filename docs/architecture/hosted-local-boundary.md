@@ -1,6 +1,6 @@
 # Hosted/Local Product Boundary
 
-Intake uses a "split-brain" architecture to ensure that sensitive client data is never accessible in plaintext on the public internet, even if the hosted backend is compromised.
+Intake uses a "split-brain" architecture to ensure that sensitive client data is eventually inaccessible in plaintext on the public internet.
 
 ## The Hosted Backend (Public)
 **Role**: Availability and Collection
@@ -8,24 +8,36 @@ Intake uses a "split-brain" architecture to ensure that sensitive client data is
 - Handles passkey authentication and session management.
 - Performs email verification.
 - Stores **ciphertext** and **redacted metadata** for quotes and uploads.
-- **Strict Rule**: Never holds the private decryption key for client data.
+- **Current Dev State**: Holds the symmetric `INTAKE_DEV_ENCRYPTION_KEY` for convenience during bootstrap development.
+- **Production Goal**: Hosted backend does not hold the private decrypt key (Local Console owns decryption authority).
 
 ## The Local Console (Private)
 **Role**: Authority and Decryption
 - Private application running on the operator's local machine.
-- Holds the **private decryption keys**.
+- **Current Dev State**: Uses the same symmetric `INTAKE_DEV_ENCRYPTION_KEY` as the hosted backend.
+- **Production Goal**: Holds the **private decryption keys** for asymmetric encryption (e.g., ECIES).
 - Connects **outbound only** to the hosted backend via the Sync Protocol.
 - Decrypts sensitive data (exact locations, questionnaire answers, original filenames) locally.
-- Manages service configurations and site content.
 
 ## The Sync Protocol
-**Direction**: Outbound-only (Local -> Hosted)
-- The Local Console polls or uses persistent outbound connections to fetch new encrypted payloads.
+**Direction**: Bi-directional (Outbound Pull / Inbound Push)
+- **Hosted-to-Local (Pull)**: The Local Console polls for new encrypted payloads.
+- **Local-to-Hosted (Push)**: The Local Console pushes **Signed Local Device Actions** to mutate hosted state.
 - **Redaction**: Hosted APIs only return shallow projections (`HostedQuoteProjection`) containing non-sensitive metadata (status, area, counts).
-- **Encrypted Envelopes**: Sensitive data is wrapped in `EncryptedPayload` objects containing AES-GCM ciphertext, nonces, and tags.
+- **Encrypted Envelopes**: Sensitive data is wrapped in `EncryptedPayload` objects containing AES-GCM ciphertext.
 
-## Data Security Properties
-- **Encryption**: AES-GCM with 256-bit keys (Fernet/AES-CBC used for some bootstrap tokens).
-- **No Mocking**: The `enc:` prefix system has been removed. All sensitive fields use the project `CryptoService`.
-- **Public Redaction**: Public status endpoints return `saved` or `stored` indicators rather than raw ciphertext.
-- **Key Isolation**: Production keys should be stored in HSM/KMS or local secure storage, never in the hosted database.
+## Signed Local Device Actions
+To ensure that only authorized local devices can mutate hosted data, Intake uses asymmetric signatures.
+- **Algorithm**: Ed25519 (Elliptic Curve Digital Signature Algorithm).
+- **Mechanism**: Each Local Console generates a signing keypair. The public key is registered with the Hosted backend.
+- **Envelopes**: Every mutation action is wrapped in a `LocalDeviceActionEnvelope` containing:
+  - Canonicalized action payload.
+  - Replay prevention (Unique `action_id`, `nonce`, and `issued_at` timestamp).
+  - Cryptographic signature.
+- **Verification**: The Hosted backend verifies the signature against the registered public key before executing any mutation.
+
+## Data Security Properties (Dev Flow)
+- **Encryption**: AES-GCM with 256-bit keys (symmetric).
+- **Public Redaction**: Public status endpoints return redacted indicators rather than raw ciphertext.
+- **Sync APIs**: Expose ciphertext only (EncryptedQuoteEnvelope), protecting against plaintext exposure on the wire.
+- **Key Isolation**: In production, Hosted Intake will never have the authority to decrypt client payloads.

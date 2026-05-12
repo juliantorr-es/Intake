@@ -90,6 +90,46 @@ def decrypt_quote(args: argparse.Namespace) -> int:
         return 1
 
 
+def sync_review(args: argparse.Namespace) -> int:
+    """Sync and review quotes from hosted backend via outbound API."""
+    from intake.local_console.review_service import LocalQuoteReviewService
+    from intake.local_console.sync_client import LocalSyncClient
+
+    try:
+        client = LocalSyncClient(sync_token=args.token)
+        service = LocalQuoteReviewService(sync_client=client)
+
+        print("Fetching pending quote projections from hosted backend...")
+        pending = service.get_pending_reviews()
+
+        if not pending:
+            print("No quotes pending review.")
+            return 0
+
+        print(f"Found {len(pending)} pending quotes:")
+        print(f"{'ID':<36} {'Status':<12} {'Area':<20} {'Uploads'}")
+        print("-" * 80)
+        for p in pending:
+            print(f"{p.quote_id:<36} {p.status:<12} {p.general_service_area or 'N/A':<20} {p.upload_count}")
+
+        if args.quote_id:
+            print(f"\nFetching and decrypting envelope for quote {args.quote_id}...")
+            review = service.get_decrypted_review(args.quote_id)
+            
+            print("\n=== Decrypted Local Review ===")
+            print(f"  ID: {review.quote_id}")
+            print(f"  Status: {review.status}")
+            print(f"  Location: {review.exact_location or 'N/A'}")
+            print(f"  Notes: {review.access_notes or 'N/A'}")
+            print(f"  Questionnaire: {review.questionnaire_answers or 'N/A'}")
+            print(f"  Decrypted Filenames: {review.decrypted_filenames}")
+
+        return 0
+    except Exception as e:
+        print(f"Sync failed: {e}", file=sys.stderr)
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -111,6 +151,12 @@ def main(argv: list[str] | None = None) -> int:
     decrypt_parser = subparsers.add_parser("decrypt-quote", help="Decrypt quote payload")
     decrypt_parser.add_argument("quote_id", help="ID of the quote to decrypt")
     decrypt_parser.set_defaults(func=decrypt_quote)
+
+    # sync-review
+    sync_parser = subparsers.add_parser("sync-review", help="Sync and review quotes via hosted API")
+    sync_parser.add_argument("--token", help="Temporary sync token (overrides env)")
+    sync_parser.add_argument("--quote-id", help="Optional quote ID to decrypt after listing")
+    sync_parser.set_defaults(func=sync_review)
 
     args = parser.parse_args(argv)
 

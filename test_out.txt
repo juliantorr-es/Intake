@@ -1,0 +1,221 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: /Users/user/Developer/GitHub/Intake
+configfile: pyproject.toml
+plugins: anyio-4.9.0, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1 item
+
+tests/test_writeback_actions.py 2026-05-11 21:47:51,568 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,568 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("accounts")
+2026-05-11 21:47:51,568 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,569 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("sessions")
+2026-05-11 21:47:51,569 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,569 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("passkey_challenges")
+2026-05-11 21:47:51,569 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("passkey_credentials")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("email_verification_codes")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("uploads")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("quotes")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("events")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("registered_devices")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("tracked_actions")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine PRAGMA main.table_info("tracked_nonces")
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine [raw sql] ()
+2026-05-11 21:47:51,570 INFO sqlalchemy.engine.Engine COMMIT
+2026-05-11 21:47:51,572 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,577 INFO sqlalchemy.engine.Engine SELECT registered_devices.device_id, registered_devices.display_name, registered_devices.public_signing_key, registered_devices.public_encryption_key, registered_devices.registered_at, registered_devices.last_seen_at, registered_devices.revoked_at, registered_devices.trust_state 
+FROM registered_devices 
+WHERE registered_devices.device_id = ?
+2026-05-11 21:47:51,577 INFO sqlalchemy.engine.Engine [generated in 0.00016s] ('test-device-1',)
+2026-05-11 21:47:51,577 INFO sqlalchemy.engine.Engine COMMIT
+2026-05-11 21:47:51,578 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,578 INFO sqlalchemy.engine.Engine SELECT quotes.id, quotes.account_id, quotes.created_at, quotes.updated_at, quotes.service_lane, quotes.short_summary, quotes.detailed_description, quotes.preferred_timeline, quotes.general_service_area, quotes.encrypted_exact_location, quotes.encrypted_access_notes, quotes.encrypted_questionnaire, quotes.status 
+FROM quotes 
+WHERE quotes.id = ?
+2026-05-11 21:47:51,578 INFO sqlalchemy.engine.Engine [generated in 0.00008s] ('quote-123',)
+2026-05-11 21:47:51,579 INFO sqlalchemy.engine.Engine SELECT uploads.id, uploads.quote_id, uploads.account_id, uploads.storage_object_id, uploads.storage_relative_path, uploads.encrypted_original_filename, uploads.declared_content_type, uploads.extension, uploads.size_bytes, uploads.status, uploads.created_at, uploads.deleted_at 
+FROM uploads 
+WHERE uploads.quote_id = ?
+2026-05-11 21:47:51,579 INFO sqlalchemy.engine.Engine [generated in 0.00006s] ('quote-123',)
+2026-05-11 21:47:51,580 INFO sqlalchemy.engine.Engine COMMIT
+2026-05-11 21:47:51,580 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,581 INFO sqlalchemy.engine.Engine SELECT quotes.id AS quotes_id, quotes.account_id AS quotes_account_id, quotes.created_at AS quotes_created_at, quotes.updated_at AS quotes_updated_at, quotes.service_lane AS quotes_service_lane, quotes.short_summary AS quotes_short_summary, quotes.detailed_description AS quotes_detailed_description, quotes.preferred_timeline AS quotes_preferred_timeline, quotes.general_service_area AS quotes_general_service_area, quotes.encrypted_exact_location AS quotes_encrypted_exact_location, quotes.encrypted_access_notes AS quotes_encrypted_access_notes, quotes.encrypted_questionnaire AS quotes_encrypted_questionnaire, quotes.status AS quotes_status 
+FROM quotes 
+WHERE quotes.id = ?
+2026-05-11 21:47:51,581 INFO sqlalchemy.engine.Engine [generated in 0.00008s] ('quote-123',)
+2026-05-11 21:47:51,582 INFO sqlalchemy.engine.Engine UPDATE quotes SET updated_at=? WHERE quotes.id = ?
+2026-05-11 21:47:51,582 INFO sqlalchemy.engine.Engine [generated in 0.00009s] ('2026-05-12 04:47:51.581388', 'quote-123')
+2026-05-11 21:47:51,582 INFO sqlalchemy.engine.Engine COMMIT
+DEBUG_CANONICAL: {"action_id":"80bc586f-b30d-421b-90dc-16f80893d14e","action_kind":"QUOTE_REVIEW_START","aggregate_id":"quote-123","aggregate_type":"quote","device_id":"test-device-1","issued_at":"2026-05-12T04:47:51.583Z","nonce":"a9c547c5-f678-48a5-930e-aadf041e9150","payload":{}}
+2026-05-11 21:47:51,595 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,595 INFO sqlalchemy.engine.Engine SELECT registered_devices.device_id, registered_devices.display_name, registered_devices.public_signing_key, registered_devices.public_encryption_key, registered_devices.registered_at, registered_devices.last_seen_at, registered_devices.revoked_at, registered_devices.trust_state 
+FROM registered_devices 
+WHERE registered_devices.device_id = ?
+2026-05-11 21:47:51,595 INFO sqlalchemy.engine.Engine [cached since 0.01829s ago] ('test-device-1',)
+2026-05-11 21:47:51,595 INFO sqlalchemy.engine.Engine COMMIT
+2026-05-11 21:47:51,595 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,596 INFO sqlalchemy.engine.Engine SELECT tracked_actions.action_id, tracked_actions.device_id, tracked_actions.issued_at, tracked_actions.received_at 
+FROM tracked_actions 
+WHERE tracked_actions.action_id = ?
+2026-05-11 21:47:51,596 INFO sqlalchemy.engine.Engine [generated in 0.00007s] ('80bc586f-b30d-421b-90dc-16f80893d14e',)
+2026-05-11 21:47:51,596 INFO sqlalchemy.engine.Engine COMMIT
+2026-05-11 21:47:51,596 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2026-05-11 21:47:51,597 INFO sqlalchemy.engine.Engine SELECT tracked_nonces.device_id, tracked_nonces.nonce, tracked_nonces.issued_at, tracked_nonces.received_at 
+FROM tracked_nonces 
+WHERE tracked_nonces.device_id = ? AND tracked_nonces.nonce = ?
+2026-05-11 21:47:51,597 INFO sqlalchemy.engine.Engine [generated in 0.00007s] ('test-device-1', 'a9c547c5-f678-48a5-930e-aadf041e9150')
+2026-05-11 21:47:51,597 INFO sqlalchemy.engine.Engine COMMIT
+DEBUG_CANONICAL: {"action_id":"80bc586f-b30d-421b-90dc-16f80893d14e","action_kind":"QUOTE_REVIEW_START","aggregate_id":"quote-123","aggregate_type":"quote","device_id":"test-device-1","issued_at":"2026-05-12T04:47:51.583Z","nonce":"a9c547c5-f678-48a5-930e-aadf041e9150","payload":{}}
+DEBUG: Response failed: 403 - {"detail":"Invalid signature. Canonical: {\"action_id\":\"80bc586f-b30d-421b-90dc-16f80893d14e\",\"action_kind\":\"QUOTE_REVIEW_START\",\"aggregate_id\":\"quote-123\",\"aggregate_type\":\"quote\",\"device_id\":\"test-device-1\",\"issued_at\":\"2026-05-12T04:47:51.583Z\",\"nonce\":\"a9c547c5-f678-48a5-930e-aadf041e9150\",\"payload\":{}}"}
+F
+
+=================================== FAILURES ===================================
+_______________________ test_quote_review_start_success ________________________
+
+client = <starlette.testclient.TestClient object at 0x10cec8830>
+setup_auth = None, sync_token = 'test-sync-token'
+signing_service = <intake.services.signing_service.LocalDeviceSigningService object at 0x10ceca900>
+registered_device = HostedRegisteredDevice(device_id='test-device-1', display_name='Test Device', public_signing_key='abuiQzSxFG9OpqIqfoHR..., 16, 727166), last_seen_at=datetime.datetime(2026, 5, 11, 21, 44, 16, 727167), revoked_at=None, trust_state='trusted')
+submitted_quote = Quote(id='quote-123', created_at=datetime.datetime(2026, 5, 12, 4, 44, 16, 731347), updated_at=datetime.datetime(2026,...ne, encrypted_access_notes=None, encrypted_questionnaire=None, uploads=[], status=<QuoteStatus.SUBMITTED: 'submitted'>)
+
+    def test_quote_review_start_success(
+        client,
+        setup_auth,
+        sync_token,
+        signing_service,
+        registered_device,
+        submitted_quote
+    ):
+        """Verify successful QUOTE_REVIEW_START transition."""
+        envelope = signing_service.sign_action(
+            device_id=registered_device.device_id,
+            action_kind="QUOTE_REVIEW_START",
+            aggregate_type="quote",
+            aggregate_id=submitted_quote.id,
+            payload={}
+        )
+    
+        response = client.post(
+            "/api/sync/actions",
+            headers={"X-Intake-Sync-Token": sync_token},
+            content=envelope.model_dump_json()
+        )
+    
+        if response.status_code != 200:
+            print(f"DEBUG: Response failed: {response.status_code} - {response.text}")
+    
+>       assert response.status_code == 200
+E       assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+tests/test_writeback_actions.py:116: AssertionError
+------------------------------ Captured log setup ------------------------------
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("accounts")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("sessions")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("passkey_challenges")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("passkey_credentials")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("email_verification_codes")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("uploads")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("quotes")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("events")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("registered_devices")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("tracked_actions")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:1843 PRAGMA main.table_info("tracked_nonces")
+INFO     sqlalchemy.engine.Engine:base.py:1843 [raw sql] ()
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT registered_devices.device_id, registered_devices.display_name, registered_devices.public_signing_key, registered_devices.public_encryption_key, registered_devices.registered_at, registered_devices.last_seen_at, registered_devices.revoked_at, registered_devices.trust_state 
+FROM registered_devices 
+WHERE registered_devices.device_id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00016s] ('test-device-1',)
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT quotes.id, quotes.account_id, quotes.created_at, quotes.updated_at, quotes.service_lane, quotes.short_summary, quotes.detailed_description, quotes.preferred_timeline, quotes.general_service_area, quotes.encrypted_exact_location, quotes.encrypted_access_notes, quotes.encrypted_questionnaire, quotes.status 
+FROM quotes 
+WHERE quotes.id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00008s] ('quote-123',)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT uploads.id, uploads.quote_id, uploads.account_id, uploads.storage_object_id, uploads.storage_relative_path, uploads.encrypted_original_filename, uploads.declared_content_type, uploads.extension, uploads.size_bytes, uploads.status, uploads.created_at, uploads.deleted_at 
+FROM uploads 
+WHERE uploads.quote_id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00006s] ('quote-123',)
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT quotes.id AS quotes_id, quotes.account_id AS quotes_account_id, quotes.created_at AS quotes_created_at, quotes.updated_at AS quotes_updated_at, quotes.service_lane AS quotes_service_lane, quotes.short_summary AS quotes_short_summary, quotes.detailed_description AS quotes_detailed_description, quotes.preferred_timeline AS quotes_preferred_timeline, quotes.general_service_area AS quotes_general_service_area, quotes.encrypted_exact_location AS quotes_encrypted_exact_location, quotes.encrypted_access_notes AS quotes_encrypted_access_notes, quotes.encrypted_questionnaire AS quotes_encrypted_questionnaire, quotes.status AS quotes_status 
+FROM quotes 
+WHERE quotes.id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00008s] ('quote-123',)
+INFO     sqlalchemy.engine.Engine:base.py:1843 UPDATE quotes SET updated_at=? WHERE quotes.id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00009s] ('2026-05-12 04:47:51.581388', 'quote-123')
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+------------------------------ Captured log call -------------------------------
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT registered_devices.device_id, registered_devices.display_name, registered_devices.public_signing_key, registered_devices.public_encryption_key, registered_devices.registered_at, registered_devices.last_seen_at, registered_devices.revoked_at, registered_devices.trust_state 
+FROM registered_devices 
+WHERE registered_devices.device_id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [cached since 0.01829s ago] ('test-device-1',)
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT tracked_actions.action_id, tracked_actions.device_id, tracked_actions.issued_at, tracked_actions.received_at 
+FROM tracked_actions 
+WHERE tracked_actions.action_id = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00007s] ('80bc586f-b30d-421b-90dc-16f80893d14e',)
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+INFO     sqlalchemy.engine.Engine:base.py:2699 BEGIN (implicit)
+INFO     sqlalchemy.engine.Engine:base.py:1843 SELECT tracked_nonces.device_id, tracked_nonces.nonce, tracked_nonces.issued_at, tracked_nonces.received_at 
+FROM tracked_nonces 
+WHERE tracked_nonces.device_id = ? AND tracked_nonces.nonce = ?
+INFO     sqlalchemy.engine.Engine:base.py:1843 [generated in 0.00007s] ('test-device-1', 'a9c547c5-f678-48a5-930e-aadf041e9150')
+INFO     sqlalchemy.engine.Engine:base.py:2705 COMMIT
+ERROR    intake.hosted.api.sync:sync.py:53 Verification error: Invalid signature. Canonical: {"action_id":"80bc586f-b30d-421b-90dc-16f80893d14e","action_kind":"QUOTE_REVIEW_START","aggregate_id":"quote-123","aggregate_type":"quote","device_id":"test-device-1","issued_at":"2026-05-12T04:47:51.583Z","nonce":"a9c547c5-f678-48a5-930e-aadf041e9150","payload":{}}
+=============================== warnings summary ===============================
+src/intake/domain/events.py:63
+  /Users/user/Developer/GitHub/Intake/src/intake/domain/events.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Event(BaseModel):
+
+src/intake/domain/projections.py:38
+  /Users/user/Developer/GitHub/Intake/src/intake/domain/projections.py:38: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class QuoteProjection(BaseModel):
+
+../../../../../opt/homebrew/lib/python3.13/site-packages/sqlmodel/main.py:583
+  /opt/homebrew/lib/python3.13/site-packages/sqlmodel/main.py:583: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    "SQLModel", super().__new__(cls, name, bases, dict_used, **config_kwargs)
+
+src/intake/sync/models.py:16
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:16: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LocalDevice(BaseModel):
+
+src/intake/sync/models.py:42
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HostedRegisteredDevice(BaseModel):
+
+src/intake/sync/models.py:67
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:67: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HostedQuoteProjection(BaseModel):
+
+src/intake/sync/models.py:113
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:113: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LocalDeviceActionEnvelope(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_writeback_actions.py::test_quote_review_start_success - ass...
+======================== 1 failed, 7 warnings in 0.65s =========================

@@ -22,5 +22,12 @@ Tests confirm that:
 - String encryption (`encrypt_string`) correctly wraps data in a JSON envelope `{"value": ...}` before encryption.
 
 ## Key Management (Dev Only)
-In development, the `INTAKE_DEV_ENCRYPTION_KEY` is loaded from `.env`. 
-- **Proof**: `tests/test_crypto_service.py` demonstrates that using the wrong key causes decryption to fail with a `ValueError`.
+In development, the `INTAKE_DEV_ENCRYPTION_KEY` is loaded from `.env` on both Hosted and Local environments.
+- **Verification**: `tests/test_crypto_service.py` demonstrates that using the wrong key causes decryption to fail with a `ValueError`.
+- **Limitation**: The current symmetric model does not yet provide cryptographic isolation between Hosted and Local; it provides data-at-rest protection and API-level redaction.
+
+## Future: Key Authority Separation
+Production will move to an asymmetric model:
+1. **Hosted**: Holds public keys of registered Local Devices; encrypts payloads.
+2. **Local**: Holds private keys; decrypts locally.
+3. **Proof**: Future tests will verify that Hosted lacks the private key material entirely.

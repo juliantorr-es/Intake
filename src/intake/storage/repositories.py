@@ -29,6 +29,9 @@ from intake.storage.models import (
     SessionModel,
     UploadModel,
     EmailVerificationCodeModel,
+    RegisteredDeviceModel,
+    TrackedActionModel,
+    TrackedNonceModel,
 )
 
 
@@ -737,3 +740,78 @@ class EmailVerificationRepository:
             return len(models)
 
 
+# ========== Sync Repository ==========
+
+
+class SyncRepository:
+    """Repository for synchronization and device operations."""
+
+    def __init__(self, session: DBSession | None = None):
+        self._session = session
+
+    @contextmanager
+    def _get_session(self) -> Any:
+        """Get a session, using provided one or creating new."""
+        if self._session:
+            yield self._session
+        else:
+            with get_session() as session:
+                yield session
+
+    def get_device(self, device_id: str) -> RegisteredDeviceModel | None:
+        """Get registered device by ID."""
+        with self._get_session() as session:
+            statement = select(RegisteredDeviceModel).where(
+                RegisteredDeviceModel.device_id == device_id
+            )
+            return session.exec(statement).first()
+
+    def create_device(self, device: Any) -> Any:
+        """Register a new device."""
+        with self._get_session() as session:
+            model = RegisteredDeviceModel.from_domain(device)
+            session.add(model)
+            session.commit()
+            session.refresh(model)
+            return model.to_domain()
+
+    def is_action_seen(self, action_id: str) -> bool:
+        """Check if an action ID has already been processed."""
+        with self._get_session() as session:
+            statement = select(TrackedActionModel).where(
+                TrackedActionModel.action_id == action_id
+            )
+            return session.exec(statement).first() is not None
+
+    def is_nonce_seen(self, device_id: str, nonce: str) -> bool:
+        """Check if a nonce has already been used by a device."""
+        with self._get_session() as session:
+            statement = select(TrackedNonceModel).where(
+                and_(
+                    TrackedNonceModel.device_id == device_id,
+                    TrackedNonceModel.nonce == nonce
+                )
+            )
+            return session.exec(statement).first() is not None
+
+    def track_action(self, action_id: str, device_id: str, issued_at: datetime) -> None:
+        """Track an action ID to prevent replay."""
+        with self._get_session() as session:
+            model = TrackedActionModel(
+                action_id=action_id,
+                device_id=device_id,
+                issued_at=issued_at
+            )
+            session.add(model)
+            session.commit()
+
+    def track_nonce(self, device_id: str, nonce: str, issued_at: datetime) -> None:
+        """Track a nonce to prevent replay."""
+        with self._get_session() as session:
+            model = TrackedNonceModel(
+                device_id=device_id,
+                nonce=nonce,
+                issued_at=issued_at
+            )
+            session.add(model)
+            session.commit()

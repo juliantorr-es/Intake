@@ -17,6 +17,9 @@ from intake.storage.models import (  # noqa: F401
     SessionModel,
     UploadModel,
     EmailVerificationCodeModel,
+    RegisteredDeviceModel,
+    TrackedActionModel,
+    TrackedNonceModel,
 )
 
 
