@@ -8,8 +8,11 @@ from pydantic import BaseModel, Field
 
 from intake.domain.projections import SafeQuoteSummary
 from intake.domain.time import utc_now
-from intake.domain.quotes import QuoteServiceLane, QuoteStatus
+from intake.domain.quotes import QuoteServiceLane, QuoteStatus, Upload
 from intake.services.quote_service import get_quote_service, QuoteService
+from intake.services.upload_service import get_upload_service, UploadService
+from intake.api.deps import get_current_account_id
+from fastapi import File, UploadFile
 
 router = APIRouter()
 
@@ -41,26 +44,12 @@ class QuoteAnswersRequest(BaseModel):
 class QuoteLocationRequest(BaseModel):
     """Request to add location to a quote."""
 
-    general_service_area: str = Field(..., description="Non-sensitive service area")
-    encrypted_exact_location: dict[str, Any] | None = Field(
-        default=None, description="Encrypted exact location payload"
+    general_service_area: str | None = Field(default=None, description="Non-sensitive service area")
+    dev_encrypted_exact_location: dict[str, Any] | None = Field(
+        default=None, description="DEV-ONLY mock encrypted exact location payload"
     )
 
 
-class QuoteUploadDeclareRequest(BaseModel):
-    """Request to declare an upload."""
-
-    original_filename: str
-    content_type: str
-    size_bytes: int
-    purpose: str = ""
-
-
-class QuoteUploadDeclareResponse(BaseModel):
-    """Response for upload declaration."""
-
-    upload_id: str
-    success: bool
 
 
 class QuoteSubmitRequest(BaseModel):
@@ -83,6 +72,19 @@ class QuoteStatusResponse(BaseModel):
     quote_id: str
     status: QuoteStatus
     service_lane: QuoteServiceLane | None = None
+    general_service_area: str | None = None
+    created_at: str
+
+
+class UploadResponse(BaseModel):
+    """Response for an upload."""
+
+    upload_id: str
+    quote_id: str
+    status: str
+    extension: str
+    declared_content_type: str
+    size_bytes: int
     created_at: str
 
 
@@ -127,24 +129,38 @@ async def add_answers(
 async def add_location(
     quote_id: str,
     request: QuoteLocationRequest,
+    account_id: str = Depends(get_current_account_id),
     service: QuoteService = Depends(get_quote_service),
 ) -> QuoteStartResponse:
     """Add location information to a quote.
 
     The exact location is encrypted before storage.
     """
-    # For now, we'll just set the general service area
-    # In a full implementation, we'd also handle the encrypted payload
-    quote = service.add_basic_info(
-        quote_id=quote_id,
-        short_summary="",
-        detailed_description="",
-        preferred_timeline=None,
-    )
+    quote = service.get_quote(quote_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found")
 
-    quote.general_service_area = request.general_service_area
+    if request.general_service_area is not None:
+        quote.general_service_area = request.general_service_area
+    
+    # If dev-only mock encrypted exact location is provided, we store it
+    if request.dev_encrypted_exact_location:
+        from intake.domain.crypto import EncryptedPayload
+        
+        raw_data = request.dev_encrypted_exact_location.get("raw")
+        if raw_data:
+            # DEV-ONLY MOCK ENCRYPTION: Prefixing with 'enc:' is for local development only.
+            # MUST be replaced by CryptoService-backed encryption before production.
+            quote.encrypted_exact_location = EncryptedPayload(
+                ciphertext=f"enc:{raw_data}",
+                nonce="dev-mock-nonce"
+            )
+        else:
+            try:
+                quote.encrypted_exact_location = EncryptedPayload(**request.dev_encrypted_exact_location)
+            except Exception:
+                pass
+
     quote.updated_at = utc_now()
     updated = service._repo.update(quote)
 
@@ -157,43 +173,18 @@ async def add_location(
     )
 
 
-@router.post("/{quote_id}/uploads/declare", response_model=QuoteUploadDeclareResponse)
-async def declare_upload(
-    quote_id: str,
-    request: QuoteUploadDeclareRequest,
-    service: QuoteService = Depends(get_quote_service),
-) -> QuoteUploadDeclareResponse:
-    """Declare an upload for a quote.
-
-    This endpoint declares metadata about an upload. Binary upload
-    handling is not implemented in this bootstrap slice.
-    """
-    quote = service.add_upload_declaration(
-        quote_id=quote_id,
-        original_filename=request.original_filename,
-        content_type=request.content_type,
-        size_bytes=request.size_bytes,
-        purpose=request.purpose,
-    )
-    if not quote or not quote.upload_declarations:
-        raise HTTPException(status_code=404, detail="Quote not found or no upload added")
-
-    latest_upload = quote.upload_declarations[-1]
-    return QuoteUploadDeclareResponse(
-        upload_id=latest_upload.upload_id,
-        success=True,
-    )
 
 
 @router.post("/{quote_id}/submit", response_model=QuoteSubmitResponse)
 async def submit_quote(
     quote_id: str,
     request: QuoteSubmitRequest,
+    account_id: str = Depends(get_current_account_id),
     service: QuoteService = Depends(get_quote_service),
 ) -> QuoteSubmitResponse:
     """Submit a quote for review."""
-    # For bootstrap, we don't require account_id
-    quote = service.submit_quote(quote_id=quote_id, account_id="bootstrap-account")
+    # Submit the quote ensuring the account owns it
+    quote = service.submit_quote(quote_id=quote_id, account_id=account_id)
     if not quote:
         raise HTTPException(status_code=404, detail="Quote not found or cannot submit")
 
@@ -218,5 +209,29 @@ async def get_quote_status(
         quote_id=quote_id,
         status=QuoteStatus(summary["status"]),
         service_lane=QuoteServiceLane(summary["service_lane"]) if summary.get("service_lane") else None,
+        general_service_area=summary.get("general_service_area"),
         created_at=summary["created_at"],
     )
+
+
+@router.post("/{quote_id}/uploads", response_model=UploadResponse)
+async def upload_file(
+    quote_id: str,
+    file: UploadFile = File(...),
+    account_id: str = Depends(get_current_account_id),
+    service: UploadService = Depends(get_upload_service),
+) -> UploadResponse:
+    """Upload a file for a quote."""
+    upload = service.handle_upload(account_id, quote_id, file)
+    return UploadResponse(**upload.get_safe_summary())
+
+
+@router.get("/{quote_id}/uploads", response_model=list[UploadResponse])
+async def list_uploads(
+    quote_id: str,
+    account_id: str = Depends(get_current_account_id),
+    service: UploadService = Depends(get_upload_service),
+) -> list[UploadResponse]:
+    """List all uploads for a quote."""
+    uploads = service.list_uploads(account_id, quote_id)
+    return [UploadResponse(**u.get_safe_summary()) for u in uploads]

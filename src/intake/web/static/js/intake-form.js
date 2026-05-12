@@ -223,10 +223,13 @@ function renderServiceLaneStep(container, handlers) {
         disabled: !state.serviceLane
     }, 'Next: Details');
     
-    nextBtn.addEventListener('click', () => {
+    nextBtn.addEventListener('click', async () => {
         if (state.serviceLane && handlers.onNext) {
             // Start a new quote
-            startQuote();
+            const success = await startQuote();
+            if (success) {
+                handlers.onNext('details');
+            }
         }
     });
     
@@ -249,16 +252,15 @@ async function startQuote() {
             body: JSON.stringify({ service_lane: state.serviceLane })
         });
         
+        if (!response.ok) throw new Error('Failed to start quote');
+        
         const data = await response.json();
         state.quoteId = data.quote_id;
-        
-        // Proceed to next step
-        if (handlers.onNext) {
-            handlers.onNext('details');
-        }
+        return true;
     } catch (error) {
         console.error('Failed to start quote:', error);
-        // Show error and re-enable
+        alert('Failed to start quote. Please try again.');
+        return false;
     }
 }
 
@@ -410,14 +412,18 @@ async function saveQuoteLocation() {
     if (!state.quoteId) return;
     
     try {
-        await fetch(`/api/quotes/${state.quoteId}/location`, {
+        const response = await fetch(`/api/quotes/${state.quoteId}/location`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 general_service_area: state.generalServiceArea,
-                encrypted_exact_location: null // Encryption handled server-side
+                dev_encrypted_exact_location: state.exactLocation ? { 
+                    // This will be encrypted by the server's service
+                    "raw": state.exactLocation 
+                } : {} // Send empty dict instead of null to avoid 422 if server is strict
             })
         });
+        if (!response.ok) throw new Error('Failed to save location');
     } catch (error) {
         console.error('Failed to save quote location:', error);
     }
@@ -510,28 +516,31 @@ function renderUploadsStep(container, handlers) {
     
     async function handleFiles(files) {
         for (const file of Array.from(files)) {
-            // Declare upload
             try {
-                const response = await fetch(`/api/quotes/${state.quoteId}/uploads/declare`, {
+                // New direct multipart upload
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(`/api/quotes/${state.quoteId}/uploads`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        original_filename: file.name,
-                        content_type: file.type || 'application/octet-stream',
-                        size_bytes: file.size,
-                        purpose: ''
-                    })
+                    body: formData // No Content-Type header, browser adds boundary
                 });
+                
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Upload failed');
+                }
                 
                 const data = await response.json();
                 state.uploads.push({
                     upload_id: data.upload_id,
                     name: file.name,
-                    type: file.type || 'application/octet-stream',
-                    size: file.size
+                    type: data.declared_content_type,
+                    size: data.size_bytes
                 });
             } catch (error) {
-                console.error('Failed to declare upload:', error);
+                console.error('Failed to upload file:', error);
+                alert(`Upload failed for ${file.name}: ${error.message}`);
             }
         }
         updateUploadList();
@@ -610,7 +619,8 @@ function renderSubmitStep(container, handlers) {
         try {
             const response = await fetch(`/api/quotes/${state.quoteId}/submit`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}) // Send empty body for QuoteSubmitRequest
             });
             
             const data = await response.json();

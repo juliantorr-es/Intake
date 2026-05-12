@@ -147,6 +147,13 @@ This bootstrap uses a single development encryption key from the environment. In
 - Separate encryption keys per tenant/data type
 - Never store private keys in the backend database
 
+#### Local-Dev Mock Encryption
+For the current slice, the **exact location** field uses mock encryption:
+- Payload is accepted as `dev_encrypted_exact_location`.
+- Storage is prefixed with `enc:` for visual verification in logs/DB.
+- This is **plumbing only** and MUST be replaced by `CryptoService`-backed encryption using established library primitives before production use.
+- Sensitive data is never returned in safe summary responses.
+
 ## Service Lanes
 
 Quote intake supports these service lanes:

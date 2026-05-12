@@ -15,7 +15,7 @@ from intake.storage.models import (  # noqa: F401
     PasskeyCredentialModel,
     QuoteModel,
     SessionModel,
-    UploadDeclarationModel,
+    UploadModel,
 )
 
 

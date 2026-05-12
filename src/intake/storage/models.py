@@ -9,7 +9,7 @@ from sqlmodel import Field, SQLModel, Column, JSON, TEXT
 from intake.domain.crypto import EncryptedPayload
 from intake.domain.events import EventAggregateType, EventType, EventActorType
 from intake.domain.passkeys import ChallengeAction, PasskeyChallengeStatus, PasskeyType
-from intake.domain.quotes import QuoteServiceLane, QuoteStatus, UploadDeclaration
+from intake.domain.quotes import QuoteServiceLane, QuoteStatus
 from intake.domain.time import utc_now
 
 
@@ -92,22 +92,61 @@ class PasskeyCredentialModel(SQLModel, table=True):
 # ========== Quote Models ==========
 
 
-class UploadDeclarationModel(SQLModel, table=True):
-    """Upload declaration database model."""
+class UploadModel(SQLModel, table=True):
+    """Upload database model."""
 
-    __tablename__ = "upload_declarations"
+    __tablename__ = "uploads"
 
     id: str = Field(default=None, primary_key=True, index=True)
     quote_id: str = Field(foreign_key="quotes.id", index=True)
-    upload_id: str = Field(index=True)
-    encrypted_filename: str = Field(sa_column=Column(TEXT))  # Encrypted original filename
-    content_type: str = Field(default="")
-    size_bytes: int = Field(default=0)
-    declaration_time: datetime = Field(default_factory=utc_now)
-    purpose: str = Field(default="")
-    encrypted_metadata: str | None = Field(
-        default=None, sa_column=Column(JSON)
-    )  # Additional encrypted metadata as JSON string
+    account_id: str = Field(foreign_key="accounts.id", index=True)
+    storage_object_id: str = Field(index=True)
+    storage_relative_path: str = Field()
+    encrypted_original_filename: str = Field(sa_column=Column(JSON))  # EncryptedPayload as JSON
+    declared_content_type: str = Field()
+    extension: str = Field()
+    size_bytes: int = Field()
+    status: str = Field(default="accepted", index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    deleted_at: datetime | None = Field(default=None, index=True)
+
+    @classmethod
+    def from_domain(cls, upload: Any) -> "UploadModel":
+        """Create a database model from a domain upload."""
+        return cls(
+            id=upload.id,
+            quote_id=upload.quote_id,
+            account_id=upload.account_id,
+            storage_object_id=upload.storage_object_id,
+            storage_relative_path=upload.storage_relative_path,
+            encrypted_original_filename=json.dumps(upload.encrypted_original_filename.model_dump()),
+            declared_content_type=upload.declared_content_type,
+            extension=upload.extension,
+            size_bytes=upload.size_bytes,
+            status=upload.status,
+            created_at=upload.created_at,
+            deleted_at=upload.deleted_at,
+        )
+
+    def to_domain(self) -> Any:
+        """Convert to domain model."""
+        from intake.domain.quotes import Upload, UploadStatus
+        from intake.domain.crypto import EncryptedPayload
+
+        return Upload(
+            id=self.id,
+            quote_id=self.quote_id,
+            account_id=self.account_id,
+            storage_object_id=self.storage_object_id,
+            storage_relative_path=self.storage_relative_path,
+            encrypted_original_filename=EncryptedPayload(**json.loads(self.encrypted_original_filename)),
+            declared_content_type=self.declared_content_type,
+            extension=self.extension,
+            size_bytes=self.size_bytes,
+            status=UploadStatus(self.status),
+            created_at=self.created_at,
+            deleted_at=self.deleted_at,
+        )
 
 
 class QuoteModel(SQLModel, table=True):
@@ -195,7 +234,6 @@ class QuoteModel(SQLModel, table=True):
                 **json.loads(self.encrypted_questionnaire)
             )
 
-        # TODO: Load upload declarations
         return Quote(
             id=self.id,
             account_id=self.account_id,
@@ -210,6 +248,7 @@ class QuoteModel(SQLModel, table=True):
             encrypted_access_notes=encrypted_access,
             encrypted_questionnaire=encrypted_questionnaire,
             status=self.status,
+            uploads=[], # To be populated by repository
         )
 
 

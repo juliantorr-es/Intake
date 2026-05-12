@@ -10,7 +10,6 @@ from intake.domain.quotes import (
     Quote,
     QuoteServiceLane,
     QuoteStatus,
-    UploadDeclaration,
 )
 from intake.services.crypto_service import get_crypto_service
 from intake.services.event_log import get_event_log_service
@@ -56,10 +55,7 @@ class QuoteService:
 
     def get_quote(self, quote_id: str) -> Quote | None:
         """Get a quote by ID."""
-        model = self._repo.get(quote_id)
-        if model:
-            return model.to_domain()
-        return None
+        return self._repo.get_by_id(quote_id)
 
     def get_all_quotes(self) -> list[Quote]:
         """Get all quotes."""
@@ -186,50 +182,6 @@ class QuoteService:
 
         return updated
 
-    def add_upload_declaration(
-        self,
-        quote_id: str,
-        original_filename: str,
-        content_type: str,
-        size_bytes: int,
-        purpose: str = "",
-    ) -> Quote | None:
-        """Add an upload declaration to a quote.
-
-        The filename is encrypted before storage.
-        """
-        quote = self.get_quote(quote_id)
-        if not quote:
-            return None
-
-        # Create upload declaration
-        upload = UploadDeclaration(
-            upload_id=UploadDeclaration.upload_id._default_func(),  # type: ignore
-            original_filename=original_filename,
-            content_type=content_type,
-            size_bytes=size_bytes,
-            purpose=purpose,
-        )
-
-        quote.upload_declarations.append(upload)
-        quote.updated_at = utc_now()
-
-        # Note: In a full implementation, we'd encrypt the filename before storage
-        # For this bootstrap, we're declaring the upload but not encrypting the metadata yet
-
-        updated = self._repo.update(quote)
-
-        # Log the event
-        if updated:
-            self._event_log.append_quote_event(
-                quote=updated,
-                event_type=EventType.QUOTE_UPLOAD_DECLARED,
-                actor_type=EventActorType.ACCOUNT,
-                actor_id=None,
-                redacted_summary=f"Upload declared ({content_type}, {size_bytes} bytes)",
-            )
-
-        return updated
 
     def submit_quote(self, quote_id: str, account_id: str) -> Quote | None:
         """Submit a quote for review."""

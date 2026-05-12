@@ -8,7 +8,7 @@ from intake.storage.models import (
     PasskeyCredentialModel,
     QuoteModel,
     SessionModel,
-    UploadDeclarationModel,
+    UploadModel,
 )
 from intake.storage.repositories import (
     AccountRepository,
@@ -27,7 +27,7 @@ __all__ = [
     "PasskeyCredentialModel",
     "QuoteModel",
     "SessionModel",
-    "UploadDeclarationModel",
+    "UploadModel",
     "AccountRepository",
     "ChallengeRepository",
     "EventRepository",

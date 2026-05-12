@@ -17,7 +17,8 @@ from intake.domain.quotes import (
     Quote,
     QuoteServiceLane,
     QuoteStatus,
-    UploadDeclaration,
+    Upload,
+    UploadStatus,
 )
 from intake.domain.time import UTC, utc_expired, utc_expires_in, utc_now
 
@@ -39,7 +40,8 @@ __all__ = [
     "Quote",
     "QuoteServiceLane",
     "QuoteStatus",
-    "UploadDeclaration",
+    "Upload",
+    "UploadStatus",
     "QuoteProjection",
     "SafeQuoteSummary",
     "UTC",

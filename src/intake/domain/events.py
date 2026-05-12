@@ -45,6 +45,8 @@ class EventType(StrEnum):
     QUOTE_LOCATION_ADDED = auto()
     QUOTE_ANSWERS_ADDED = auto()
     QUOTE_UPLOAD_DECLARED = auto()
+    QUOTE_UPLOAD_ACCEPTED = auto()
+    QUOTE_UPLOAD_DELETED = auto()
 
 
 class EventActorType(StrEnum):

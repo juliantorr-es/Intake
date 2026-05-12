@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 from contextlib import contextmanager
 
-from sqlmodel import select, and_, or_, func
+from sqlmodel import select, and_, or_, func, update
 
 from intake.config import get_settings
 from intake.domain.accounts import Account, Session as SessionDomain
@@ -18,7 +18,7 @@ from intake.domain.passkeys import (
     PasskeyChallengeStatus,
     PasskeyCredential,
 )
-from intake.domain.quotes import Quote, QuoteStatus, UploadDeclaration
+from intake.domain.quotes import Quote, QuoteStatus, Upload, UploadStatus
 from intake.storage.db import get_session, Session as DBSession
 from intake.storage.models import (
     AccountModel,
@@ -27,7 +27,7 @@ from intake.storage.models import (
     PasskeyCredentialModel,
     QuoteModel,
     SessionModel,
-    UploadDeclarationModel,
+    UploadModel,
 )
 
 
@@ -451,6 +451,8 @@ class PasskeyRepository:
 # ========== Quote Repository ==========
 
 
+
+
 class QuoteRepository:
     """Repository for quote operations."""
 
@@ -466,23 +468,52 @@ class QuoteRepository:
             with get_session() as session:
                 yield session
 
+    def _load_uploads(self, session: Any, quote_model: QuoteModel) -> list[Any]:
+        """Load uploads for a quote model."""
+        statement = select(UploadModel).where(UploadModel.quote_id == quote_model.id)
+        upload_models = session.exec(statement).all()
+        return [m.to_domain() for m in upload_models]
+
+    def get_by_id(self, quote_id: str) -> Quote | None:
+        """Get quote by ID (domain model)."""
+        with self._get_session() as session:
+            statement = select(QuoteModel).where(QuoteModel.id == quote_id)
+            model = session.exec(statement).first()
+            if model:
+                domain = model.to_domain()
+                domain.uploads = self._load_uploads(session, model)
+                return domain
+            return None
+
     def get(self, quote_id: str) -> QuoteModel | None:
-        """Get quote by ID."""
+        """Get quote by ID (storage model)."""
         with self._get_session() as session:
             statement = select(QuoteModel).where(QuoteModel.id == quote_id)
             return session.exec(statement).first()
 
-    def get_by_account(self, account_id: str) -> list[QuoteModel]:
-        """Get all quotes for an account."""
+    def get_by_account(self, account_id: str) -> list[Quote]:
+        """Get all quotes for an account (domain models)."""
         with self._get_session() as session:
             statement = select(QuoteModel).where(QuoteModel.account_id == account_id)
-            return list(session.exec(statement).all())
+            models = session.exec(statement).all()
+            results = []
+            for m in models:
+                domain = m.to_domain()
+                domain.uploads = self._load_uploads(session, m)
+                results.append(domain)
+            return results
 
-    def get_by_status(self, status: QuoteStatus) -> list[QuoteModel]:
-        """Get all quotes with a specific status."""
+    def get_by_status(self, status: QuoteStatus) -> list[Quote]:
+        """Get all quotes with a specific status (domain models)."""
         with self._get_session() as session:
             statement = select(QuoteModel).where(QuoteModel.status == status)
-            return list(session.exec(statement).all())
+            models = session.exec(statement).all()
+            results = []
+            for m in models:
+                domain = m.to_domain()
+                domain.uploads = self._load_uploads(session, m)
+                results.append(domain)
+            return results
 
     def create(self, quote: Quote) -> Quote:
         """Create a new quote."""
@@ -542,7 +573,19 @@ class QuoteRepository:
         with self._get_session() as session:
             statement = select(QuoteModel)
             models = list(session.exec(statement).all())
-            return [m.to_domain() for m in models]
+            results = []
+            for m in models:
+                domain = m.to_domain()
+                domain.uploads = self._load_uploads(session, m)
+                results.append(domain)
+            return results
+
+    def add_upload(self, upload: Any) -> None:
+        """Add an upload record."""
+        with self._get_session() as session:
+            model = UploadModel.from_domain(upload)
+            session.add(model)
+            session.commit()
 
 
 # ========== Event Repository ==========
@@ -601,5 +644,3 @@ class EventRepository:
             return [m.to_domain() for m in models]
 
 
-# SQLAlchemy update import for ChallengeRepository.invalidate_expired
-from sqlmodel import update

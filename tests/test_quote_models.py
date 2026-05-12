@@ -6,7 +6,8 @@ from intake.domain.quotes import (
     Quote,
     QuoteServiceLane,
     QuoteStatus,
-    UploadDeclaration,
+    Upload,
+    UploadStatus,
 )
 
 
@@ -23,7 +24,7 @@ def test_quote_creation_defaults():
     assert quote.encrypted_exact_location is None
     assert quote.encrypted_access_notes is None
     assert quote.encrypted_questionnaire is None
-    assert quote.upload_declarations == []
+    assert quote.uploads == []
 
 
 def test_quote_creation_with_values():
@@ -113,9 +114,27 @@ def test_quote_get_safe_summary():
         detailed_description="Detailed description",
         general_service_area="Test Area",
         status=QuoteStatus.DRAFT,
-        upload_declarations=[
-            UploadDeclaration(upload_id="upload-1", original_filename="test.jpg", content_type="image/jpeg", size_bytes=1024),
-            UploadDeclaration(upload_id="upload-2", original_filename="test2.png", content_type="image/png", size_bytes=2048),
+        uploads=[
+            Upload(
+                quote_id="test-id", 
+                account_id="user-1", 
+                storage_object_id="obj1", 
+                storage_relative_path="path1", 
+                encrypted_original_filename={"ciphertext": "enc:test.jpg", "nonce": "nonce"},
+                extension=".jpg",
+                declared_content_type="image/jpeg",
+                size_bytes=1024
+            ),
+            Upload(
+                quote_id="test-id", 
+                account_id="user-1", 
+                storage_object_id="obj2", 
+                storage_relative_path="path2", 
+                encrypted_original_filename={"ciphertext": "enc:test2.png", "nonce": "nonce"},
+                extension=".png",
+                declared_content_type="image/png",
+                size_bytes=2048
+            ),
         ],
     )
 
@@ -131,24 +150,25 @@ def test_quote_get_safe_summary():
     # Should not include sensitive data
     assert "detailed_description" not in summary
     assert "encrypted_exact_location" not in summary
-    assert "upload_declarations" not in summary
+    assert "uploads" not in summary
 
 
-def test_upload_declaration():
-    """Test upload declaration model."""
-    upload = UploadDeclaration(
-        upload_id="test-upload",
-        original_filename="document.pdf",
-        content_type="application/pdf",
+def test_upload_model():
+    """Test upload domain model."""
+    upload = Upload(
+        quote_id="quote-1",
+        account_id="user-1",
+        storage_object_id="storage-1",
+        storage_relative_path="rel/path",
+        encrypted_original_filename={"ciphertext": "enc:doc.pdf", "nonce": "nonce"},
+        extension=".pdf",
+        declared_content_type="application/pdf",
         size_bytes=102400,
-        purpose="portfolio",
     )
 
-    assert upload.upload_id == "test-upload"
-    assert upload.original_filename == "document.pdf"
-    assert upload.content_type == "application/pdf"
+    assert upload.quote_id == "quote-1"
+    assert upload.declared_content_type == "application/pdf"
     assert upload.size_bytes == 102400
-    assert upload.purpose == "portfolio"
 
 
 def test_quote_aggregate_type():

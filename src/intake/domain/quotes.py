@@ -34,15 +34,41 @@ class QuoteStatus(StrEnum):
     CLOSED = "closed"
 
 
-class UploadDeclaration(BaseModel):
-    """Declaration of an upload (metadata only, no binary data)."""
+class UploadStatus(StrEnum):
+    """Status of an upload."""
 
-    upload_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
-    original_filename: str  # Encrypted in storage
-    content_type: str
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    DELETED = "deleted"
+
+
+class Upload(BaseModel):
+    """Metadata for an uploaded file."""
+
+    id: str = Field(default_factory=lambda: uuid.uuid4().hex)
+    quote_id: str
+    account_id: str
+    storage_object_id: str  # Random unguessable ID for the filename on disk
+    storage_relative_path: str  # Relative path from upload root
+    encrypted_original_filename: EncryptedPayload
+    declared_content_type: str
+    extension: str
     size_bytes: int
-    declaration_time: datetime = Field(default_factory=utc_now)
-    purpose: str = ""  # e.g., "portfolio", "reference", "example"
+    status: UploadStatus = UploadStatus.ACCEPTED
+    created_at: datetime = Field(default_factory=utc_now)
+    deleted_at: datetime | None = None
+
+    def get_safe_summary(self) -> dict[str, Any]:
+        """Return a summary with no sensitive data."""
+        return {
+            "upload_id": self.id,
+            "quote_id": self.quote_id,
+            "status": self.status,
+            "extension": self.extension,
+            "declared_content_type": self.declared_content_type,
+            "size_bytes": self.size_bytes,
+            "created_at": self.created_at.isoformat(),
+        }
 
 
 class Quote(BaseModel):
@@ -73,8 +99,8 @@ class Quote(BaseModel):
     # Questionnaire answers (encrypted)
     encrypted_questionnaire: EncryptedPayload | None = None
 
-    # Upload declarations
-    upload_declarations: list[UploadDeclaration] = Field(default_factory=list)
+    # Uploads
+    uploads: list[Upload] = Field(default_factory=list)
 
     # Status
     status: QuoteStatus = QuoteStatus.DRAFT
@@ -104,5 +130,5 @@ class Quote(BaseModel):
             "short_summary": self.short_summary,
             "general_service_area": self.general_service_area,
             "status": self.status,
-            "upload_count": len(self.upload_declarations),
+            "upload_count": len(self.uploads),
         }
