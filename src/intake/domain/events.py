@@ -5,7 +5,7 @@ from datetime import datetime
 from enum import StrEnum, auto
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from intake.domain.time import utc_now
 
@@ -78,8 +78,7 @@ class Event(BaseModel):
     redacted_summary: str = ""
     encrypted_payload: str | None = None  # Base64-encoded encrypted JSON
 
-    class Config:
-        frozen = True  # Events are immutable
+    model_config = ConfigDict(frozen=True)
 
     @classmethod
     def for_quote(

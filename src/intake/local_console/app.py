@@ -65,19 +65,6 @@ def main():
     
     print(f"Local Console Server started at {url}")
     
-    # If INTAKE_HEADLESS is set, we don't start the pywebview window
-    # This is used when hosting the UI in a native shell (like SwiftUI)
-    if os.environ.get("INTAKE_HEADLESS") == "1":
-        print("Running in HEADLESS mode (native shell hosting).")
-        # Keep the main thread alive since server is in background
-        try:
-            while True:
-                import time
-                time.sleep(1)
-        except KeyboardInterrupt:
-            pass
-        return
-
     # Create pywebview window
     webview.create_window(
         "Intake Local Console",

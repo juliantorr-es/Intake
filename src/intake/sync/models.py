@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 from enum import StrEnum, auto
 from typing import Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class SyncDirection(StrEnum):
@@ -35,8 +35,7 @@ class LocalDevice(BaseModel):
     
     trust_state: str = "pending" # pending, trusted, revoked
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class HostedRegisteredDevice(BaseModel):
@@ -53,8 +52,7 @@ class HostedRegisteredDevice(BaseModel):
     # Metadata for the sync session
     trust_state: str
     
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class LocalDeviceSession(BaseModel):
@@ -97,8 +95,7 @@ class HostedQuoteProjection(BaseModel):
         )
 
     # Explicitly excluding sensitive fields to prevent accidental leakage
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 from intake.domain.crypto import EncryptedPayload
@@ -153,8 +150,7 @@ class LocalDeviceActionEnvelope(BaseModel):
     signature: str
     signature_algorithm: str = "ed25519"
     
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
     def get_canonical_payload(self) -> bytes:
         """Return a deterministic JSON representation for signing/verification."""

@@ -10,7 +10,7 @@ struct IntakeConsoleApp: App {
     init() {
         let url = URL(string: "http://127.0.0.1:8000")!
         _healthClient = StateObject(wrappedValue: BackendHealthClient(url: url))
-        _launcher = StateObject(wrappedValue: BackendLauncher(mode: .development))
+        _launcher = StateObject(wrappedValue: BackendLauncher(mode: .managed))
     }
     
     var body: some Scene {

@@ -10,6 +10,7 @@ from intake.domain.crypto import EncryptedPayload
 from intake.domain.events import EventAggregateType, EventType, EventActorType
 from intake.domain.passkeys import ChallengeAction, PasskeyChallengeStatus, PasskeyType
 from intake.domain.quotes import QuoteServiceLane, QuoteStatus
+from pydantic import ConfigDict
 from intake.domain.time import utc_now
 
 
@@ -387,8 +388,7 @@ class EventModel(SQLModel, table=True):
     )  # EncryptedPayload as JSON string
 
     # Events are append-only and immutable
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_domain(cls, event: Any) -> "EventModel":
