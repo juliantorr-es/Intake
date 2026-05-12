@@ -169,6 +169,37 @@
                         </div>
                     </div>
                 </div>
+            <section id="view-settings" class="view hidden">
+                <div class="panel">
+                    <h3>Security Settings</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Local Secure Unlock</label>
+                            <span id="settings-unlock-required" class="badge">Checking...</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Unlock Timeout (TTL)</label>
+                            <span id="settings-unlock-ttl">...</span>
+                        </div>
+                        <div class="info-item vertical">
+                            <label>Security Note</label>
+                            <p style="font-size: 13px; color: var(--color-muted); margin-top: 4px;">
+                                Local Secure Unlock uses macOS LocalAuthentication (Touch ID/Passcode) to gate access to decrypted quote data.
+                                This is managed by the native Intake shell.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel mt-4">
+                    <h3>Environment</h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <label>Workspace Root</label>
+                            <code id="settings-workspace-root" style="font-size: 11px;">...</code>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
     </div>

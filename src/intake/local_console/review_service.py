@@ -9,7 +9,6 @@ from intake.local_console.sync_client import LocalSyncClient
 from intake.services.crypto_service import get_crypto_service, CryptoService
 from intake.services.signing_service import LocalDeviceSigningService
 from intake.config import get_settings
-from intake.local_console.security.unlock import get_auth_window
 
 class UploadEvidence(BaseModel):
     """Evidence of a file upload."""
@@ -34,7 +33,6 @@ class LocalDecryptedQuoteReview(BaseModel):
     email_verified: bool = False
     upload_count: int = 0
     is_decrypted: bool = False
-    is_locked: bool = True
     
     # Decrypted fields
     exact_location: str | None = None
@@ -111,22 +109,7 @@ class LocalQuoteReviewService:
                 stored_at=datetime.now()
             ))
 
-        # 5. Check if we need to redact due to lock
-        settings = get_settings()
-        is_locked = False
-        if settings.intake_require_local_unlock_for_decrypt:
-            is_locked = not get_auth_window().is_unlocked
-
-        if is_locked:
-            # Redact sensitive fields
-            exact_location = None
-            access_notes = None
-            questionnaire = None
-            # Mask filenames in evidence
-            for ev in evidence:
-                ev.original_filename = "[LOCKED]"
-
-        # 6. Create the local-only review model
+        # 5. Create the local-only review model
         return LocalDecryptedQuoteReview(
             quote_id=quote_id,
             status=projection.status,
@@ -136,8 +119,7 @@ class LocalQuoteReviewService:
             updated_at=projection.updated_at,
             email_verified=True, # Simulation
             upload_count=projection.upload_count,
-            is_decrypted=not is_locked,
-            is_locked=is_locked,
+            is_decrypted=True,
             exact_location=exact_location,
             access_notes=access_notes,
             questionnaire_answers=questionnaire,

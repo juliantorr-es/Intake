@@ -41,7 +41,8 @@ function showView(viewId) {
     const titles = {
         'view-dashboard': 'Dashboard',
         'view-quotes': 'Pending Quotes',
-        'view-quote-detail': 'Quote Review'
+        'view-quote-detail': 'Quote Review',
+        'view-settings': 'Settings'
     };
     document.getElementById('page-title').textContent = titles[viewId] || 'Console';
 }
@@ -64,6 +65,18 @@ async function updateStatus() {
         const signKeyEl = document.getElementById('conf-signing-key');
         signKeyEl.textContent = status.signing_key_configured ? 'Active' : 'Not Set';
         signKeyEl.className = 'badge ' + (status.signing_key_configured ? 'success' : 'warning');
+        
+        // Settings Page
+        const unlockReqEl = document.getElementById('settings-unlock-required');
+        if (unlockReqEl) {
+            unlockReqEl.textContent = status.local_unlock_required ? 'Enabled' : 'Disabled';
+            unlockReqEl.className = 'badge ' + (status.local_unlock_required ? 'success' : 'warning');
+        }
+        
+        const unlockTTLEl = document.getElementById('settings-unlock-ttl');
+        if (unlockTTLEl) {
+            unlockTTLEl.textContent = `${status.local_unlock_ttl} seconds`;
+        }
         
     } catch (err) {
         console.error('Failed to update status:', err);
