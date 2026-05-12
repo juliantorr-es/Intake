@@ -28,7 +28,6 @@ struct ContentView: View {
     @StateObject var healthClient: BackendHealthClient
     @StateObject var launcher: BackendLauncher
     @StateObject var authState = LocalAuthorizationState()
-    private let secureUnlockService = SecureUnlockService()
     
     @State private var selectedSection: NavSection? = .quotes
     @State private var reloadTrigger = 0
@@ -112,10 +111,19 @@ struct ContentView: View {
     }
     
     private func performSecureUnlock() {
-        secureUnlockService.requestUnlock(reason: "Access decrypted client intake data") { success in
-            if success {
-                authState.markUnlocked()
-                notifyBackendOfUnlock()
+        Task {
+            let result = await SecureUnlockService.shared.requestUnlock(reason: "Access decrypted client intake data")
+            
+            await MainActor.run {
+                switch result {
+                case .success:
+                    authState.unlock()
+                    notifyBackendOfUnlock()
+                case .failed(let reason):
+                    authState.setFailed(reason: reason)
+                case .cancelled, .unavailable:
+                    break
+                }
             }
         }
     }

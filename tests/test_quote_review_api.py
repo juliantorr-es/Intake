@@ -52,7 +52,7 @@ def test_quote_review_model_redaction():
     allowed_keys = {
         "quote_id", "status", "service_lane", "general_service_area", 
         "created_at", "updated_at", "email_verified", "upload_count", 
-        "is_decrypted", "exact_location", "access_notes", 
+        "is_decrypted", "is_locked", "exact_location", "access_notes", 
         "questionnaire_answers", "upload_evidence"
     }
     assert set(data.keys()).issubset(allowed_keys)

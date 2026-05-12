@@ -56,5 +56,6 @@ A scaffold for binding the local authority to a cryptographic secret.
 - [x] In-memory auth window
 - [x] Server-side redaction logic
 - [x] Manual "Lock Now" capability
+- [x] E2E Dogfood Verification
 - [ ] Cryptographic binding to Keychain-protected key
 - [ ] Session binding between Swift shell and FastAPI via shared secret

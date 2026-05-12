@@ -40,7 +40,7 @@ async def get_pending_quotes(quote_service: Any = Depends(get_quote_service)):
     """Get non-sensitive projections of quotes needing review."""
     quotes = quote_service.get_all_quotes()
     # Filter for those needing review
-    pending = [q for q in quotes if q.status in [QuoteStatus.SUBMITTED, QuoteStatus.NEEDS_REVIEW]]
+    pending = [q for q in quotes if q.status in [QuoteStatus.SUBMITTED, QuoteStatus.NEEDS_REVIEW, QuoteStatus.REVIEWING]]
     return [HostedQuoteProjection.from_domain(q) for q in pending]
 
 @router.get("/quotes/{quote_id}/envelope", dependencies=[Depends(verify_sync_token)], response_model=EncryptedQuoteEnvelope)
