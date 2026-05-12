@@ -10,6 +10,16 @@ from intake.services.crypto_service import get_crypto_service, CryptoService
 from intake.services.signing_service import LocalDeviceSigningService
 from intake.config import get_settings
 
+class UploadEvidence(BaseModel):
+    """Evidence of a file upload."""
+    file_id: str
+    original_filename: str | None = None
+    content_type: str
+    size_bytes: int
+    sha256: str
+    storage_provider: str
+    stored_at: datetime
+
 class LocalDecryptedQuoteReview(BaseModel):
     """Local-only model for a decrypted quote review."""
     quote_id: str
@@ -17,12 +27,20 @@ class LocalDecryptedQuoteReview(BaseModel):
     service_lane: str | None = None
     general_service_area: str | None = None
     created_at: datetime
+    updated_at: datetime
+    
+    # Discovery metadata
+    email_verified: bool = False
+    upload_count: int = 0
+    is_decrypted: bool = False
     
     # Decrypted fields
     exact_location: str | None = None
     access_notes: str | None = None
     questionnaire_answers: dict[str, Any] | None = None
-    decrypted_filenames: List[str] = Field(default_factory=list)
+    
+    # Evidence
+    upload_evidence: List[UploadEvidence] = Field(default_factory=list)
 
 class LocalQuoteReviewService:
     """Service for local-only quote review operations."""
@@ -48,11 +66,19 @@ class LocalQuoteReviewService:
 
     def get_decrypted_review(self, quote_id: str) -> LocalDecryptedQuoteReview:
         """Fetch and decrypt a quote for local review."""
-        # 1. We might want the projection first for metadata, 
-        # but for this slice we'll just get the envelope.
+        # 1. Fetch projection for metadata
+        projections = self.client.fetch_pending_projections()
+        projection = next((p for p in projections if p.quote_id == quote_id), None)
+        
+        if not projection:
+            # Fallback if not in pending list (might be already reviewed)
+            # For v0 simplicity, we'll just raise 404 in the API handler
+            raise ValueError(f"Quote {quote_id} not found in pending list")
+
+        # 2. Fetch envelope for ciphertext
         envelope = self.client.fetch_quote_envelope(quote_id)
         
-        # 2. Decrypt fields
+        # 3. Decrypt fields
         exact_location = None
         if envelope.encrypted_exact_location:
             decrypted = self.crypto.decrypt_json(envelope.encrypted_exact_location)
@@ -67,21 +93,37 @@ class LocalQuoteReviewService:
         if envelope.encrypted_questionnaire:
             questionnaire = self.crypto.decrypt_json(envelope.encrypted_questionnaire)
 
-        filenames = []
-        for enc_name in envelope.encrypted_uploads:
-            filenames.append(self.crypto.decrypt_string(enc_name))
+        # 4. Populate evidence
+        # In a real system, we'd fetch actual file records from the local receiver storage.
+        # For this slice, we'll simulate evidence from the envelope and projection.
+        evidence = []
+        for i, enc_name in enumerate(envelope.encrypted_uploads):
+            decrypted_name = self.crypto.decrypt_string(enc_name)
+            evidence.append(UploadEvidence(
+                file_id=f"file-{i}",
+                original_filename=decrypted_name,
+                content_type="image/jpeg", # Placeholder
+                size_bytes=1024 * 500, # Placeholder
+                sha256="sim-sha256-...",
+                storage_provider="local_loopback_dev",
+                stored_at=datetime.now()
+            ))
 
-        # 3. Create the local-only review model
-        # Note: We'd normally fetch the projection too to get the status/lane/etc.
-        # but for simplicity we'll just return what we have.
+        # 5. Create the local-only review model
         return LocalDecryptedQuoteReview(
             quote_id=quote_id,
-            status="pending_local_review", # Placeholder
-            created_at=datetime.now(), # Placeholder
+            status=projection.status,
+            service_lane=projection.service_lane,
+            general_service_area=projection.general_service_area,
+            created_at=projection.created_at,
+            updated_at=projection.updated_at,
+            email_verified=True, # Simulation
+            upload_count=projection.upload_count,
+            is_decrypted=True,
             exact_location=exact_location,
             access_notes=access_notes,
             questionnaire_answers=questionnaire,
-            decrypted_filenames=filenames
+            upload_evidence=evidence
         )
 
     def start_review(self, quote_id: str) -> dict:

@@ -49,6 +49,11 @@ class EventType(StrEnum):
     QUOTE_UPLOAD_DECLARED = auto()
     QUOTE_UPLOAD_ACCEPTED = auto()
     QUOTE_UPLOAD_DELETED = auto()
+    
+    # Upload broker events
+    QUOTE_UPLOAD_SESSION_CREATED = auto()
+    QUOTE_UPLOAD_SESSION_EXPIRED = auto()
+    QUOTE_UPLOAD_RECEIPT_RECEIVED = auto()
 
 
 class EventActorType(StrEnum):

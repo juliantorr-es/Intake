@@ -97,31 +97,29 @@
 
             <section id="view-quote-detail" class="view hidden">
                 <button class="btn-back" id="btn-back-to-list">← Back to List</button>
-                <div class="detail-header">
-                    <h2 id="detail-quote-id">Quote Details</h2>
-                    <div class="header-actions">
-                        <span class="badge" id="detail-status">...</span>
-                        <button id="btn-start-review" class="btn btn-primary hidden">Start Review</button>
+                
+                <!-- Quote Header -->
+                <div class="panel">
+                    <div class="detail-header">
+                        <div>
+                            <h2 id="detail-quote-id">Quote Details</h2>
+                            <div class="header-metadata" style="display: flex; gap: 12px; margin-top: -8px;">
+                                <span class="badge info" id="detail-lane">...</span>
+                                <span class="badge" id="detail-area">...</span>
+                                <span class="badge success" id="detail-email-verified">Email Verified</span>
+                            </div>
+                        </div>
+                        <div class="header-actions">
+                            <span class="badge warning" id="detail-status">...</span>
+                            <button id="btn-start-review" class="btn btn-primary hidden">Start Review</button>
+                        </div>
                     </div>
                 </div>
                 
                 <div class="grid-detail">
-                    <div class="panel">
-                        <h3>Safe Metadata</h3>
-                        <div class="info-list">
-                            <div class="info-item">
-                                <label>Service Lane</label>
-                                <span id="detail-lane">...</span>
-                            </div>
-                            <div class="info-item">
-                                <label>Area</label>
-                                <span id="detail-area">...</span>
-                            </div>
-                        </div>
-                    </div>
-                    
+                    <!-- Decrypted Content -->
                     <div class="panel highlight">
-                        <h3>Decrypted Sensitive Data</h3>
+                        <h3><span class="badge private" style="margin-right: 8px;">Private</span> Decrypted Local-only View</h3>
                         <div class="info-list">
                             <div class="info-item vertical">
                                 <label>Exact Location</label>
@@ -132,8 +130,22 @@
                                 <div class="decrypted-box" id="detail-notes">...</div>
                             </div>
                             <div class="info-item vertical">
-                                <label>Questionnaire</label>
+                                <label>Questionnaire Responses</label>
                                 <pre class="decrypted-box" id="detail-questionnaire">...</pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Evidence -->
+                    <div class="panel">
+                        <h3>Upload Evidence</h3>
+                        <div class="info-list">
+                            <div class="info-item">
+                                <label>Total Uploads</label>
+                                <span id="detail-upload-count">0</span>
+                            </div>
+                            <div class="upload-evidence-list" id="detail-upload-evidence">
+                                <!-- Evidence rows injected here -->
                             </div>
                         </div>
                     </div>

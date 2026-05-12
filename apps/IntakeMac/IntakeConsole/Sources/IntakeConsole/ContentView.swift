@@ -173,10 +173,22 @@ struct ProofRailView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
-                    ProofItemView(title: "Signed Action", subtitle: "sha256: 7cf6d4...", time: "12:01", icon: "pencil.and.outline")
-                    ProofItemView(title: "Sync Event", subtitle: "Pulled 3 quotes", time: "11:58", icon: "arrow.triangle.2.circlepath")
-                    ProofItemView(title: "Upload Receipt", subtitle: "2 files stored", time: "11:45", icon: "doc.badge.checkmark")
-                    ProofItemView(title: "Security State", subtitle: "Keys verified", time: "11:30", icon: "lock.fill", color: IntakeTheme.Colors.statePrivate)
+                    ProofItemView(title: "Local Decrypt", subtitle: "Quote payload verified", time: "NOW", icon: "lock.open.fill", color: IntakeTheme.Colors.stateOk)
+                    ProofItemView(title: "Local Sync", subtitle: "Pulled 3 projections", time: "2m", icon: "arrow.triangle.2.circlepath", color: IntakeTheme.Colors.stateInfo)
+                    ProofItemView(title: "Payload Stored", subtitle: "Encrypted envelope @ Hosted", time: "1h", icon: "tray.and.arrow.down.fill")
+                    ProofItemView(title: "Upload Received", subtitle: "2 files @ Local Receiver", time: "1h", icon: "doc.badge.checkmark", color: IntakeTheme.Colors.stateOk)
+                    ProofItemView(title: "Quote Submitted", subtitle: "Client session completed", time: "1h", icon: "paperplane.fill")
+                    ProofItemView(title: "Email Verified", subtitle: "Client identity confirmed", time: "1h", icon: "checkmark.seal.fill", color: IntakeTheme.Colors.stateOk)
+                    ProofItemView(title: "Passkey Auth", subtitle: "Device registration", time: "2h", icon: "key.fill")
+                    
+                    Divider().padding(.vertical, 8)
+                    
+                    Text("SIGNED ACTIONS")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(IntakeTheme.Colors.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    ProofItemView(title: "Review Started", subtitle: "Action placeholder", time: "---", icon: "signature")
                 }
                 .padding()
             }

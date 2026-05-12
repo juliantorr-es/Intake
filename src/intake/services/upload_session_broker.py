@@ -14,12 +14,9 @@ from typing import Any, Optional
 
 from fastapi import HTTPException
 
-from intake.deploy.models_upload import UploadProviderKind, UploadRouteDecision
-from intake.deploy.tunnel_adapters.models import TunnelProviderKind
+from intake.deploy.models_upload import UploadProviderKind
 from intake.domain.events import Event, EventActorType, EventType
 from intake.domain.quotes import (
-    Quote,
-    QuoteRepository,
     QuoteStatus,
     UploadReceipt,
     UploadReceiptStatus,
@@ -28,8 +25,8 @@ from intake.domain.quotes import (
 )
 from intake.domain.time import utc_now
 from intake.local_console.receiver.route_decision import UploadRouteDecisionService
-from intake.services.quote_service import get_quote_service, QuoteService
-from intake.storage.repositories import AccountRepository, EventRepository
+from intake.storage.repositories import AccountRepository, EventRepository, QuoteRepository
+from intake.services.quote_service import get_quote_service
 
 
 # Upload session configuration
@@ -64,18 +61,12 @@ class UploadSessionBroker:
         account_repo: AccountRepository | None = None,
         event_repo: EventRepository | None = None,
         route_decision_service: UploadRouteDecisionService | None = None,
-        quote_service: QuoteService | None = None,
     ):
         """Initialize the upload session broker."""
-        from intake.storage.repositories import QuoteRepository, AccountRepository, EventRepository
-        from intake.local_console.receiver.route_decision import UploadRouteDecisionService
-        from intake.services.quote_service import QuoteService
-        
         self._quote_repo = quote_repo or QuoteRepository()
         self._account_repo = account_repo or AccountRepository()
         self._event_repo = event_repo or EventRepository()
         self._route_decision = route_decision_service or UploadRouteDecisionService()
-        self._quote_service = quote_service or get_quote_service()
         
         # Session store: session_id -> UploadSession
         self._sessions: dict[str, UploadSession] = {}

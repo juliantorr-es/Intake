@@ -107,6 +107,10 @@ async function loadPendingQuotes() {
         });
     } catch (err) {
         console.error('Failed to load quotes:', err);
+        const tbody = document.getElementById('quote-list-body');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--state-error);">Hosted backend unavailable or sync failed.</td></tr>';
+        }
     }
 }
 
@@ -116,13 +120,64 @@ async function showQuoteDetail(quoteId) {
         const detail = await response.json();
         
         document.getElementById('detail-quote-id').textContent = `Quote ${detail.quote_id}`;
-        document.getElementById('detail-status').textContent = detail.status;
-        document.getElementById('detail-lane').textContent = detail.service_lane || 'N/A';
+        document.getElementById('detail-status').textContent = detail.status.toUpperCase();
+        document.getElementById('detail-lane').textContent = detail.service_lane || 'GENERAL';
         document.getElementById('detail-area').textContent = detail.general_service_area || 'N/A';
+        document.getElementById('detail-email-verified').classList.toggle('hidden', !detail.email_verified);
         
         document.getElementById('detail-location').textContent = detail.exact_location || 'Not provided';
         document.getElementById('detail-notes').textContent = detail.access_notes || 'No notes';
         document.getElementById('detail-questionnaire').textContent = JSON.stringify(detail.questionnaire_answers, null, 2);
+        
+        // Render evidence
+        document.getElementById('detail-upload-count').textContent = detail.upload_count;
+        const evidenceContainer = document.getElementById('detail-upload-evidence');
+        evidenceContainer.innerHTML = '';
+        
+        if (detail.upload_evidence && detail.upload_evidence.length > 0) {
+            detail.upload_evidence.forEach(ev => {
+                const row = document.createElement('div');
+                row.className = 'info-item';
+                row.style.marginTop = '12px';
+                row.style.borderTop = '1px solid var(--color-border)';
+                row.style.paddingTop = '8px';
+                
+                const left = document.createElement('div');
+                left.style.display = 'flex';
+                left.style.flexDirection = 'column';
+                
+                const filename = document.createElement('span');
+                filename.style.fontWeight = '600';
+                filename.style.fontSize = '13px';
+                filename.textContent = ev.original_filename || `file-${ev.file_id.substring(0, 8)}`;
+                
+                const meta = document.createElement('span');
+                meta.style.fontSize = '11px';
+                meta.style.color = 'var(--color-muted)';
+                meta.style.fontFamily = 'var(--font-mono)';
+                meta.textContent = `${ev.content_type} • ${(ev.size_bytes / 1024).toFixed(1)} KB • sha256:${ev.sha256.substring(0, 8)}`;
+                
+                left.appendChild(filename);
+                left.appendChild(meta);
+                
+                const provider = document.createElement('span');
+                provider.className = 'badge';
+                provider.style.fontSize = '10px';
+                provider.textContent = ev.storage_provider;
+                
+                row.appendChild(left);
+                row.appendChild(provider);
+                
+                evidenceContainer.appendChild(row);
+            });
+        } else {
+            const empty = document.createElement('div');
+            empty.className = 'info-item';
+            empty.style.color = 'var(--color-muted)';
+            empty.style.fontStyle = 'italic';
+            empty.textContent = 'No upload evidence available';
+            evidenceContainer.appendChild(empty);
+        }
         
         // Handle "Start Review" button visibility
         const btnStart = document.getElementById('btn-start-review');
@@ -133,10 +188,35 @@ async function showQuoteDetail(quoteId) {
             btnStart.classList.add('hidden');
         }
 
+        // Mock Proof Rail Update (this would ideally trigger a native shell event)
+        console.log('Updating Proof Rail for quote:', quoteId);
+        
         showView('view-quote-detail');
     } catch (err) {
         console.error('Failed to load quote detail:', err);
-        alert('Failed to load quote detail. See console for logs.');
+        const detailContainer = document.getElementById('view-quote-detail');
+        
+        // Simple error state display
+        const errorPanel = document.createElement('div');
+        errorPanel.className = 'panel';
+        errorPanel.style.borderColor = 'var(--state-error)';
+        
+        const h3 = document.createElement('h3');
+        h3.style.color = 'var(--state-error)';
+        h3.textContent = 'Decryption Failed';
+        
+        const p = document.createElement('p');
+        p.textContent = 'The quote payload could not be decrypted. Ensure your local encryption key is configured correctly.';
+        
+        errorPanel.appendChild(h3);
+        errorPanel.appendChild(p);
+        
+        const evidenceContainer = document.getElementById('detail-upload-evidence');
+        if (evidenceContainer) evidenceContainer.innerHTML = '';
+        
+        showView('view-quote-detail');
+        // Prepend error panel
+        detailContainer.insertBefore(errorPanel, detailContainer.querySelector('.panel').nextSibling);
     }
 }
 
