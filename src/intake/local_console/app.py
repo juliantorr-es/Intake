@@ -37,6 +37,12 @@ async def index(request: Request):
     """Render the main console UI."""
     return templates.TemplateResponse("index.html", {"request": request})
 
+
+@app.get("/costs", response_class=HTMLResponse)
+async def costs_view(request: Request):
+    """Render the Vendor Cost Ledger UI."""
+    return templates.TemplateResponse("costs.html", {"request": request})
+
 def run_server(port):
     """Run the local FastAPI server."""
     # Force 127.0.0.1 for security
@@ -59,6 +65,19 @@ def main():
     
     print(f"Local Console Server started at {url}")
     
+    # If INTAKE_HEADLESS is set, we don't start the pywebview window
+    # This is used when hosting the UI in a native shell (like SwiftUI)
+    if os.environ.get("INTAKE_HEADLESS") == "1":
+        print("Running in HEADLESS mode (native shell hosting).")
+        # Keep the main thread alive since server is in background
+        try:
+            while True:
+                import time
+                time.sleep(1)
+        except KeyboardInterrupt:
+            pass
+        return
+
     # Create pywebview window
     webview.create_window(
         "Intake Local Console",

@@ -157,7 +157,7 @@ class UploadRouteDecisionService:
                     route_reason="local_receiver_online_and_capable",
                     fallback_available=bool(self._fallback_provider),
                     fallback_provider=self._fallback_provider,
-                    upload_endpoint="/receiver/uploads",
+                    upload_endpoint="http://127.0.0.1:8001/receiver/uploads",
                     upload_session={"type": "local_loopback"},
                     expires_at=datetime.now(timezone.utc) + timedelta(minutes=30),
                     receiver_handshake_success=True,

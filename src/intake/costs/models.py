@@ -212,7 +212,7 @@ class VendorPricingFact(BaseModel):
     updated_at: Optional[datetime] = None
     tags: list[str] = Field(default_factory=list)
     
-    def getsafe_display(self) -> dict[str, Any]:
+    def get_safe_display(self) -> dict[str, Any]:
         """Return safe display with no sensitive data."""
         return {
             "fact_id": self.fact_id,

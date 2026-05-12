@@ -194,4 +194,3 @@ class SyncEvent(BaseModel):
     event_type: str
     redacted_summary: str
     details: dict[str, Any] = Field(default_factory=dict)
-ls: dict[str, Any] = Field(default_factory=dict)

@@ -195,12 +195,17 @@ class ScenarioDetailResponse(BaseModel):
     overall_confidence: str
     overall_risk_level: str
     created_at: str
-    updated_at: Optional[str]
+    updated_at: Optional[str] = None
 
 
 class ScenarioListResponse(BaseModel):
     """Response with list of scenarios."""
     scenarios: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ReceiptListResponse(BaseModel):
+    """Response with list of receipts."""
+    receipts: list[dict[str, Any]] = Field(default_factory=list)
 
 
 # =============================================================================
@@ -217,7 +222,7 @@ async def list_providers(calculator: CostCalculator = Depends(get_cost_calculato
     providers = calculator.list_providers()
     
     return ProviderListResponse(
-        providers=[p.get_safe_display() for p in providers]
+        providers=[p.model_dump() for p in providers]
     )
 
 
@@ -226,20 +231,13 @@ async def create_scenario(
     request: CreateScenarioRequest,
     calculator: CostCalculator = Depends(get_cost_calculator),
 ):
-    """Create a new cost estimate scenario.
-    
-    A scenario is a container for:
-    - Line items (individual costs)
-    - Assumptions (inputs used in calculations)
-    - Source snapshots (where pricing data came from)
-    """
+    """Create a new cost estimate scenario."""
     scenario = calculator.create_scenario(
         display_name=request.display_name,
         description=request.description,
-        created_by="local_console",  # In production, use authenticated user
+        created_by="local_console",
     )
     
-    # Add tags after creation
     scenario.tags = request.tags
     calculator.update_scenario(scenario)
     
@@ -297,16 +295,7 @@ async def add_line_item(
     request: AddLineItemRequest,
     calculator: CostCalculator = Depends(get_cost_calculator),
 ):
-    """Add a line item to a scenario.
-    
-    A line item represents a single cost in the estimate.
-    It includes:
-    - Provider and category
-    - Quantity and unit price
-    - Frequency (one-time, monthly, etc.)
-    - Links to assumptions and facts
-    - Confidence and risk levels
-    """
+    """Add a line item to a scenario."""
     try:
         line_item = calculator.add_line_item(
             scenario_id=scenario_id,
@@ -353,17 +342,7 @@ async def add_assumption(
     request: AddAssumptionRequest,
     calculator: CostCalculator = Depends(get_cost_calculator),
 ):
-    """Add an assumption to a scenario.
-    
-    Assumptions are the inputs used in cost calculations.
-    Every estimate must include its assumptions.
-    
-    Examples of assumptions:
-    - "10GB of storage needed"
-    - "1000 requests per day"
-    - "2 CPU cores required"
-    - "$0.10 per GB for egress"
-    """
+    """Add an assumption to a scenario."""
     try:
         assumption = calculator.add_assumption(
             scenario_id=scenario_id,
@@ -402,13 +381,7 @@ async def add_snapshot(
     request: AddSnapshotRequest,
     calculator: CostCalculator = Depends(get_cost_calculator),
 ):
-    """Add a source snapshot.
-    
-    A snapshot records that pricing data was obtained from a specific URL
-    at a specific time. The actual page content is NOT stored.
-    
-    This provides an audit trail for where pricing information came from.
-    """
+    """Add a source snapshot."""
     try:
         vendor_kind = VendorProviderKind(request.vendor_kind) if request.vendor_kind else None
         snapshot = calculator.add_snapshot(
@@ -437,31 +410,14 @@ async def generate_receipt(
     request: GenerateReceiptRequest,
     calculator: CostCalculator = Depends(get_cost_calculator),
 ):
-    """Generate a cost receipt from a scenario.
-    
-    The receipt:
-    - States pricing may change
-    - Separates provider costs from Intake costs
-    - Never includes secret/provider credentials
-    - Includes source URLs and timestamps
-    
-    Receipts are useful for:
-    - Client quotes
-    - Deployment planning documentation
-    - Cost comparison between providers
-    """
+    """Generate a cost receipt from a scenario."""
     try:
-        disclaimer = request.disclaimer or (
-            "Pricing may change. Please verify current rates with vendors. "
-            "This estimate is based on publicly available information and assumptions."
-        )
-        
         receipt = calculator.generate_receipt(
             scenario_id=request.scenario_id,
             display_name=request.display_name,
             description=request.description,
             valid_until_days=request.valid_until_days,
-            disclaimer=disclaimer,
+            disclaimer=request.disclaimer,
             created_by="local_console",
             client_id=request.client_id,
             quote_id=request.quote_id,
@@ -486,4 +442,16 @@ async def generate_receipt(
         valid_until=receipt.valid_until.isoformat() if receipt.valid_until else None,
         disclaimer=receipt.disclaimer,
         created_at=receipt.created_at.isoformat(),
+    )
+
+
+@router.get("/receipts", response_model=ReceiptListResponse)
+async def list_receipts(
+    calculator: CostCalculator = Depends(get_cost_calculator),
+):
+    """List all generated cost receipts."""
+    receipts = calculator.list_receipts()
+    
+    return ReceiptListResponse(
+        receipts=[r.get_safe_display() for r in receipts]
     )

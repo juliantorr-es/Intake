@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intake Local Console - Costs</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-text">Intake</span>
+            </div>
+            <nav class="main-nav">
+                <a href="/" class="nav-item" id="nav-dashboard">Dashboard</a>
+                <a href="/costs" class="nav-item active" id="nav-costs">Costs</a>
+                <a href="#" class="nav-item" id="nav-quotes">Quotes</a>
+                <a href="#" class="nav-item" id="nav-settings">Settings</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="badge success">Local Console</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="content-area">
+            <header class="top-bar">
+                <h1 id="page-title">Vendor Cost Ledger</h1>
+                <div class="actions">
+                    <button id="btn-new-scenario" class="btn btn-primary">
+                        <span class="icon">+</span> New Scenario
+                    </button>
+                </div>
+            </header>
+
+            <section class="view">
+                <!-- Providers Section -->
+                <div class="card">
+                    <h2>Vendor Providers</h2>
+                    <p class="muted">Available third-party service providers for cost estimation.</p>
+                    <div id="providers-list" class="grid-table">
+                        <div class="grid-header">
+                            <span>Name</span>
+                            <span>Kind</span>
+                            <span>Description</span>
+                            <span>Website</span>
+                        </div>
+                        <div id="providers-rows"></div>
+                    </div>
+                </div>
+
+                <!-- Scenarios Section -->
+                <div class="card">
+                    <h2>Cost Scenarios</h2>
+                    <p class="muted">Estimate and track deployment costs across providers.</p>
+                    <div class="actions-bar">
+                        <button id="btn-refresh-scenarios" class="btn btn-secondary">
+                            <span class="icon">↻</span> Refresh
+                        </button>
+                    </div>
+                    <div id="scenarios-list" class="list-view">
+                        <div id="scenarios-rows"></div>
+                    </div>
+                </div>
+
+                <!-- Receipts Section -->
+                <div class="card">
+                    <h2>Cost Receipts</h2>
+                    <p class="muted">Generated cost estimates and pricing receipts.</p>
+                    <div id="receipts-list" class="list-view">
+                        <div id="receipts-rows"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- New Scenario Modal -->
+    <div id="modal-new-scenario" class="modal" style="display: none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <h2>New Cost Scenario</h2>
+            <form id="form-new-scenario">
+                <div class="form-group">
+                    <label for="scenario-name">Display Name</label>
+                    <input type="text" id="scenario-name" placeholder="e.g., Production Deployment" required>
+                </div>
+                <div class="form-group">
+                    <label for="scenario-desc">Description</label>
+                    <textarea id="scenario-desc" placeholder="Describe the deployment scenario..." rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-scenario')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Scenario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Simple API client
+        async function fetchAPI(endpoint, options = {}) {
+            const baseUrl = '/api/local';
+            const response = await fetch(baseUrl + endpoint, {
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            });
+            if (!response.ok) {
+                console.error('API error:', response.status, await response.text());
+                return null;
+            }
+            return response.json();
+        }
+
+        // Load providers
+        async function loadProviders() {
+            const data = await fetchAPI('/costs/providers');
+            if (!data) return;
+            
+            const container = document.getElementById('providers-rows');
+            container.innerHTML = data.providers.map(p => `
+                <div class="grid-row">
+                    <span>${p.display_name}</span>
+                    <span><code>${p.kind}</code></span>
+                    <span>${p.description || '-'}</span>
+                    <span><a href="${p.website_url || '#'}" target="_blank">${p.website_url ? 'View' : '-'}</a></span>
+                </div>
+            `).join('');
+        }
+
+        // Load scenarios
+        async function loadScenarios() {
+            const data = await fetchAPI('/costs/scenarios');
+            if (!data) return;
+            
+            const container = document.getElementById('scenarios-rows');
+            if (data.scenarios && data.scenarios.length > 0) {
+                container.innerHTML = data.scenarios.map(s => `
+                    <div class="list-item" onclick="viewScenario('${s.scenario_id}')">
+                        <div class="item-header">
+                            <span class="item-title">${s.display_name}</span>
+                            <span class="badge">${s.overall_confidence}</span>
+                        </div>
+                        <div class="item-meta">
+                            <span class="muted">${s.description || 'No description'}</span>
+                        </div>
+                        <div class="item-footer">
+                            <span>Total: $${s.total_monthly_usd ? s.total_monthly_usd.toFixed(2) : '0.00'}/mo</span>
+                            <span class="muted">${new Date(s.created_at).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="muted">No scenarios yet. Create your first scenario.</p>';
+            }
+        }
+
+        // Load receipts
+        async function loadReceipts() {
+            const data = await fetchAPI('/costs/receipts');
+            if (!data) return;
+            
+            const container = document.getElementById('receipts-rows');
+            if (data.receipts && data.receipts.length > 0) {
+                container.innerHTML = data.receipts.map(r => `
+                    <div class="list-item" onclick="viewReceipt('${r.receipt_id}')">
+                        <div class="item-header">
+                            <span class="item-title">${r.display_name}</span>
+                            <span class="badge">${r.currency}</span>
+                        </div>
+                        <div class="item-meta">
+                            <span class="muted">Scenario: ${r.scenario_id}</span>
+                        </div>
+                        <div class="item-footer">
+                            <span>Total: $${r.total_usd ? r.total_usd.toFixed(2) : '0.00'}</span>
+                            <span class="muted">${new Date(r.created_at).toLocaleDateString()}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="muted">No receipts yet. Generate a receipt from a scenario.</p>';
+            }
+        }
+
+        // Create new scenario
+        async function createScenario() {
+            const name = document.getElementById('scenario-name').value;
+            const desc = document.getElementById('scenario-desc').value;
+            
+            const response = await fetchAPI('/costs/scenarios', {
+                method: 'POST',
+                body: JSON.stringify({ display_name: name, description: desc })
+            });
+            
+            if (response) {
+                closeModal('modal-new-scenario');
+                document.getElementById('form-new-scenario').reset();
+                loadScenarios();
+            }
+        }
+
+        function viewScenario(scenarioId) {
+            console.log('View scenario:', scenarioId);
+            // TODO: Implement scenario detail view
+            alert('Scenario detail view coming soon: ' + scenarioId);
+        }
+
+        function viewReceipt(receiptId) {
+            console.log('View receipt:', receiptId);
+            // TODO: Implement receipt detail view
+            alert('Receipt detail view coming soon: ' + receiptId);
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function showModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        // Event listeners
+        document.getElementById('btn-new-scenario').addEventListener('click', () => showModal('modal-new-scenario'));
+        document.getElementById('btn-refresh-scenarios').addEventListener('click', () => {
+            loadScenarios();
+            loadReceipts();
+        });
+        document.getElementById('form-new-scenario').addEventListener('submit', (e) => {
+            e.preventDefault();
+            createScenario();
+        });
+
+        // Close modal on overlay click
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', () => {
+                const modal = overlay.closest('.modal');
+                closeModal(modal.id);
+            });
+        });
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProviders();
+            loadScenarios();
+            loadReceipts();
+        });
+    </script>
+</body>
+</html>

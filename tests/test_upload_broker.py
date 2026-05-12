@@ -65,6 +65,10 @@ def mock_quote_repo():
         
         def add(self, quote: Quote) -> None:
             self.quotes[quote.id] = quote
+        
+        def update(self, quote: Quote) -> Quote:
+            self.quotes[quote.id] = quote
+            return quote
     
     repo = MockQuoteRepo()
     # Add a test quote
@@ -243,10 +247,16 @@ class TestUploadRouteQuoteStatus:
                     status=QuoteStatus.CLOSED,
                 )
             
-            def get_by_id(self, quote_id):
+            def get_by_id(self, quote_id: str) -> Quote | None:
                 if quote_id == "closed_quote":
                     return self.quote
                 return None
+
+            def update(self, quote: Quote) -> Quote:
+                if quote.id == "closed_quote":
+                    self.quote = quote
+                return quote
+
         return ClosedQuoteRepo()
     
     def test_upload_route_rejects_closed_quote(self, broker, closed_quote_repo):
@@ -272,10 +282,16 @@ class TestUploadRouteQuoteStatus:
                     status=QuoteStatus.QUOTED,
                 )
             
-            def get_by_id(self, quote_id):
+            def get_by_id(self, quote_id: str) -> Quote | None:
                 if quote_id == "quoted_quote":
                     return self.quote
                 return None
+
+            def update(self, quote: Quote) -> Quote:
+                if quote.id == "quoted_quote":
+                    self.quote = quote
+                return quote
+
         return QuotedQuoteRepo()
     
     def test_upload_route_rejects_quoted_quote(self, broker, quoted_quote_repo):
@@ -300,10 +316,16 @@ class TestUploadRouteQuoteStatus:
                     status=QuoteStatus.DRAFT,
                 )
             
-            def get_by_id(self, quote_id):
+            def get_by_id(self, quote_id: str) -> Quote | None:
                 if quote_id == "draft_quote":
                     return self.quote
                 return None
+
+            def update(self, quote: Quote) -> Quote:
+                if quote.id == "draft_quote":
+                    self.quote = quote
+                return quote
+
         return DraftQuoteRepo()
     
     def test_upload_route_accepts_draft_quote(self, broker, draft_quote_repo, mock_route_decision):

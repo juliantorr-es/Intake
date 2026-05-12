@@ -294,10 +294,18 @@ class UploadSessionBroker:
             signed_by_device_id=signed_by_device_id,
         )
         
-        # 8. Store receipt
+        # 8. Store receipt in broker memory
         self._receipts[receipt.id] = receipt
         
-        # 9. Update session to mark as having receipts
+        # 9. Update quote record with the receipt
+        if quote:
+            if not hasattr(quote, "uploads") or quote.uploads is None:
+                quote.uploads = []
+            quote.uploads.append(receipt)
+            quote.updated_at = utc_now()
+            self._quote_repo.update(quote)
+            
+        # 10. Update session to mark as having receipts
         # In production, this would update DB; for now, in-memory
         
         # 10. Log event (redacted - no local paths)

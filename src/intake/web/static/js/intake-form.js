@@ -517,29 +517,115 @@ function renderUploadsStep(container, handlers) {
     async function handleFiles(files) {
         for (const file of Array.from(files)) {
             try {
-                // New direct multipart upload
-                const formData = new FormData();
-                formData.append('file', file);
-
-                const response = await fetch(`/api/quotes/${state.quoteId}/uploads`, {
+                // 1. Request upload route from broker
+                const routeResponse = await fetch(`/api/quotes/${state.quoteId}/upload-route`, {
                     method: 'POST',
-                    body: formData // No Content-Type header, browser adds boundary
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        requested_content_types: [file.type],
+                        requested_max_file_size: file.size
+                    })
                 });
-                
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.detail || 'Upload failed');
+
+                if (!routeResponse.ok) {
+                    const err = await routeResponse.json();
+                    throw new Error(err.detail || 'Failed to get upload route');
                 }
+
+                const route = await routeResponse.json();
+                console.log('Got upload route:', route);
+
+                let receipt;
+
+                if (route.provider === 'local_loopback_dev') {
+                    // LOCAL RECEIVER FLOW
+                    // 1a. Create session on Local Receiver
+                    const receiverSessionResponse = await fetch(`${route.upload_endpoint}/session`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            quote_id: state.quoteId,
+                            expires_at: new Date(Date.now() + 15 * 60000).toISOString(),
+                            max_file_size_bytes: route.max_file_size_bytes,
+                            allowed_content_types: route.allowed_content_types,
+                            allowed_extensions: route.allowed_extensions
+                        })
+                    });
+
+                    if (!receiverSessionResponse.ok) {
+                        const err = await receiverSessionResponse.json();
+                        throw new Error(err.detail || 'Failed to create receiver session');
+                    }
+
+                    const receiverSession = await receiverSessionResponse.json();
+                    
+                    // 1b. Upload file to Local Receiver session
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('declared_content_type', file.type);
+                    formData.append('original_filename', file.name);
+
+                    const uploadResponse = await fetch(`${route.upload_endpoint}/${receiverSession.session_id}/file`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) {
+                        const err = await uploadResponse.json();
+                        throw new Error(err.detail?.error || err.detail || 'Local upload failed');
+                    }
+
+                    receipt = await uploadResponse.json();
+                } else {
+                    // FALLBACK/CLOUD FLOW (Direct upload)
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const uploadResponse = await fetch(route.upload_endpoint, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) {
+                        const err = await uploadResponse.json();
+                        throw new Error(err.detail || 'Cloud upload failed');
+                    }
+
+                    receipt = await uploadResponse.json();
+                }
+
+                console.log('Got upload receipt from provider:', receipt);
+
+                // 2. Submit receipt back to Hosted Broker
+                const submitResponse = await fetch(`/api/quotes/${state.quoteId}/uploads/receipt`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        upload_session_id: route.upload_session_id,
+                        provider: route.provider,
+                        storage_object_id: receipt.file_id || receipt.storage_object_id,
+                        size_bytes: receipt.size_bytes,
+                        sha256: receipt.sha256,
+                        declared_content_type: receipt.declared_content_type || file.type,
+                        extension: receipt.extension || file.name.split('.').pop()
+                    })
+                });
+
+                if (!submitResponse.ok) {
+                    const err = await submitResponse.json();
+                    throw new Error(err.detail || 'Failed to submit receipt');
+                }
+
+                const finalReceipt = await submitResponse.json();
                 
-                const data = await response.json();
                 state.uploads.push({
-                    upload_id: data.upload_id,
+                    upload_id: finalReceipt.receipt_id,
                     name: file.name,
-                    type: data.declared_content_type,
-                    size: data.size_bytes
+                    type: finalReceipt.declared_content_type,
+                    size: finalReceipt.size_bytes
                 });
             } catch (error) {
-                console.error('Failed to upload file:', error);
+                console.error('Failed to upload file via broker:', error);
                 alert(`Upload failed for ${file.name}: ${error.message}`);
             }
         }

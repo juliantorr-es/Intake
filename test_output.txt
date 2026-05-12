@@ -1,0 +1,73 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: /Users/user/Developer/GitHub/Intake
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.9.0, asyncio-1.3.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 331 items
+
+tests/services/test_passkey_service_v2.py ..                             [  0%]
+tests/services/test_upload_service.py ........                           [  3%]
+tests/test_auth_persistence.py ............................              [ 11%]
+tests/test_cost_ledger.py .....................................          [ 22%]
+tests/test_crypto_payload_boundary.py ....                               [ 23%]
+tests/test_crypto_service.py ..........                                  [ 26%]
+tests/test_deployment_artifacts.py ....                                  [ 28%]
+tests/test_email_verification.py .......                                 [ 30%]
+tests/test_event_log.py .........                                        [ 32%]
+tests/test_health.py ..                                                  [ 33%]
+tests/test_local_console_api.py ...                                      [ 34%]
+tests/test_local_device_identity.py .....                                [ 35%]
+tests/test_local_receiver.py ..................                          [ 41%]
+tests/test_module_boundaries.py ..                                       [ 41%]
+tests/test_passkey_shapes.py ...............                             [ 46%]
+tests/test_provider_routing.py ....................................      [ 57%]
+tests/test_quote_api_flow.py .....                                       [ 58%]
+tests/test_quote_models.py ..........                                    [ 61%]
+tests/test_quote_review_api.py ....                                      [ 63%]
+tests/test_railway_dry_run.py ........................                   [ 70%]
+tests/test_signed_actions.py ........                                    [ 72%]
+tests/test_sync_models.py ......                                         [ 74%]
+tests/test_sync_protocol.py .........                                    [ 77%]
+tests/test_time_helper.py ......                                         [ 79%]
+tests/test_tunnel_adapters.py ........................................   [ 91%]
+tests/test_upload_broker.py ........................                     [ 98%]
+tests/test_writeback_actions.py .....                                    [100%]
+
+=============================== warnings summary ===============================
+src/intake/domain/events.py:68
+  /Users/user/Developer/GitHub/Intake/src/intake/domain/events.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Event(BaseModel):
+
+src/intake/domain/projections.py:38
+  /Users/user/Developer/GitHub/Intake/src/intake/domain/projections.py:38: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class QuoteProjection(BaseModel):
+
+../../../../../opt/homebrew/lib/python3.13/site-packages/sqlmodel/main.py:583
+  /opt/homebrew/lib/python3.13/site-packages/sqlmodel/main.py:583: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    "SQLModel", super().__new__(cls, name, bases, dict_used, **config_kwargs)
+
+src/intake/sync/models.py:16
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:16: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LocalDevice(BaseModel):
+
+src/intake/sync/models.py:42
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HostedRegisteredDevice(BaseModel):
+
+src/intake/sync/models.py:67
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:67: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HostedQuoteProjection(BaseModel):
+
+src/intake/sync/models.py:139
+  /Users/user/Developer/GitHub/Intake/src/intake/sync/models.py:139: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LocalDeviceActionEnvelope(BaseModel):
+
+tests/test_local_receiver.py: 17 warnings
+tests/test_tunnel_adapters.py: 28 warnings
+  /opt/homebrew/lib/python3.13/site-packages/pydantic/main.py:263: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 331 passed, 52 warnings in 3.47s =======================
